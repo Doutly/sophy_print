@@ -130,7 +130,7 @@ function StudentPrintFlow() {
         try {
           const timestamp = Date.now();
           const cleanName = uploadedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-          storagePath = `orders/${timestamp}_${cleanName}`;
+          storagePath = `orders/pending/${timestamp}_${cleanName}`;
           const storageReference = ref(storage, storagePath);
           await uploadBytes(storageReference, uploadedFile);
           downloadUrl = await getDownloadURL(storageReference);
@@ -148,7 +148,7 @@ function StudentPrintFlow() {
         pageRange: pageSelection === "all" ? "all" : customRangeInput,
         copies,
         amount: total,
-        status: "Printing",
+        status: "Pending",
         student: "Campus Student",
         phone: "Self-Pickup",
         pickupCode: Math.floor(1000 + Math.random() * 9000).toString(),

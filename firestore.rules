@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Admin check function
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    match /orders/{orderId} {
+      // Anyone can create a pending order
+      allow create: if request.resource.data.status == "Pending";
+      
+      // Only admins can read, update or delete orders
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Other collections (gateways, pricing, etc.) only accessible by admin
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Admin check function
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    match /orders/pending/{fileId} {
+      // Anyone can upload a file to the pending folder if it meets criteria
+      allow write: if request.resource.size < 50 * 1024 * 1024 // 50MB max
+                   && request.resource.contentType.matches('application/pdf|application/vnd.openxmlformats-officedocument.*|application/msword');
+    }
+
+    // Admins can read, write, and delete any file (including processed orders)
+    match /{allPaths=**} {
+      allow read, write, delete: if isAdmin();
+    }
+  }
+}
