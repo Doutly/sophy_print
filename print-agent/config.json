@@ -1,0 +1,19 @@
+{
+  "gatewayId": "SHOP-PC-01",
+  "shopName": "Campus Xerox & Print Center",
+  "firebaseConfig": {
+    "apiKey": "AIzaSyA3uzmkIR1nJV9vrBlsNGLGUUzRQZXlecU",
+    "authDomain": "sophy-print.firebaseapp.com",
+    "projectId": "sophy-print",
+    "storageBucket": "sophy-print.firebasestorage.app",
+    "messagingSenderId": "102832836431",
+    "appId": "1:102832836431:web:6cf61ae6daac1d9b02ff3a",
+    "measurementId": "G-0NPXYHVKVS"
+  },
+  "printers": {
+    "bw": "Kyocera MZ3200i",
+    "colour": "Epson L5290"
+  },
+  "pollIntervalSeconds": 3,
+  "heartbeatIntervalSeconds": 15
+}
