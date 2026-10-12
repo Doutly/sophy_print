@@ -3,6 +3,7 @@ title Doutly Print Gateway - Shop Computer
 cls
 echo ========================================================
 echo   Starting Doutly Print Gateway Agent
+echo   Hardware: Dual Canon iR-ADV 4545i III (LAN) + Epson L5290
 echo ========================================================
 echo.
 

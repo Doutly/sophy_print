@@ -77,6 +77,7 @@ title Doutly Print Gateway Setup
 cls
 echo ========================================================
 echo   Setting up Doutly Print Gateway for Windows
+echo   Hardware: Dual Canon iR-ADV 4545i III (LAN) + Epson L5290
 echo ========================================================
 echo.
 
@@ -115,7 +116,7 @@ echo [2/3] Writing package.json...
 (
 echo {
 echo   "name": "doutly-print-agent",
-echo   "version": "2.4.0",
+echo   "version": "2.5.0",
 echo   "dependencies": {
 echo     "firebase": "^11.4.0"
 echo   }
