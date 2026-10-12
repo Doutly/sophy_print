@@ -1,6 +1,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -200,8 +201,13 @@ export async function createPrintOrder(order: Omit<PrintJob, "id" | "placed"> & 
     pickupCode: order.pickupCode || Math.floor(1000 + Math.random() * 9000).toString(),
   };
 
+  // Strip any undefined keys so Firestore setDoc never throws Unsupported field value: undefined
+  const firestoreData = Object.fromEntries(
+    Object.entries(newJob).filter(([_, v]) => v !== undefined)
+  );
+
   // Firestore is the primary source of truth — write here first
-  await setDoc(doc(db, "orders", id), newJob);
+  await setDoc(doc(db, "orders", id), firestoreData);
 
   // Update in-memory session cache so admin UI reflects the change immediately
   printJobs = [newJob, ...printJobs];
@@ -230,23 +236,28 @@ export async function purgeFileFromStorage(jobId: string, storagePath?: string):
     try {
       const storageReference = ref(storage, storagePath);
       await deleteObject(storageReference);
-    } catch (err) {
-      console.warn("Storage object already deleted or not found:", err);
+    } catch (err: any) {
+      // If object doesn't exist (already deleted or failed upload), proceed with purging metadata
+      if (err?.code !== "storage/object-not-found") {
+        console.warn("Storage object deletion issue:", err);
+      }
     }
   }
 
+  const nowIso = new Date().toISOString();
   const updates = {
     isPurged: true,
-    storagePath: undefined,
-    downloadUrl: undefined,
+    storagePath: deleteField(),
+    downloadUrl: deleteField(),
     status: "Purged" as JobStatus,
-    purgedAt: new Date().toISOString(),
+    purgedAt: nowIso,
   };
 
   try {
     await updateDoc(doc(db, "orders", jobId), updates);
   } catch (err) {
-    console.warn("Could not update Firestore document for purge:", err);
+    console.error("Could not update Firestore document for purge:", err);
+    throw err;
   }
 
   const currentJobs = getStoredPrintJobs();
@@ -258,7 +269,7 @@ export async function purgeFileFromStorage(jobId: string, storagePath?: string):
           storagePath: undefined,
           downloadUrl: undefined,
           status: "Purged" as JobStatus,
-          purgedAt: updates.purgedAt,
+          purgedAt: nowIso,
         }
       : j
   );
@@ -306,15 +317,18 @@ export async function deleteOrderCompletely(jobId: string, storagePath?: string)
     try {
       const storageReference = ref(storage, storagePath);
       await deleteObject(storageReference);
-    } catch (err) {
-      console.warn("Storage object already deleted:", err);
+    } catch (err: any) {
+      if (err?.code !== "storage/object-not-found") {
+        console.warn("Storage object already deleted or not found:", err);
+      }
     }
   }
 
   try {
     await deleteDoc(doc(db, "orders", jobId));
   } catch (err) {
-    console.warn("Could not delete Firestore document:", err);
+    console.error("Could not delete Firestore document:", err);
+    throw err;
   }
 
   const currentJobs = getStoredPrintJobs();
