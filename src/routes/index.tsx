@@ -712,8 +712,18 @@ function StudentPrintFlow() {
                   size="sm"
                   onClick={() => {
                     const code = createdOrder?.id || "2762";
-                    navigator.clipboard.writeText(code);
-                    toast.success(`Copied code #${code} to clipboard`);
+                    if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+                      navigator.clipboard
+                        .writeText(code)
+                        .then(() => {
+                          toast.success(`Copied code #${code} to clipboard`);
+                        })
+                        .catch(() => {
+                          fallbackCopyText(code);
+                        });
+                    } else {
+                      fallbackCopyText(code);
+                    }
                   }}
                   className="gap-1.5 text-xs h-8"
                 >
@@ -735,6 +745,29 @@ function StudentPrintFlow() {
       </div>
     </main>
   );
+}
+
+function fallbackCopyText(text: string) {
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "-9999px";
+    textArea.setAttribute("readonly", "");
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (successful) {
+      toast.success(`Copied code #${text} to clipboard`);
+    } else {
+      toast.info(`Pickup Code is #${text}`);
+    }
+  } catch {
+    toast.info(`Pickup Code is #${text}`);
+  }
 }
 
 function Setting({ title, children }: { title: string; children: React.ReactNode }) {
