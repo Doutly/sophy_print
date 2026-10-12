@@ -1,20 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Admin check function
+    // Admin check: any authenticated user is treated as admin
     function isAdmin() {
       return request.auth != null;
     }
 
     match /orders/{orderId} {
-      // Anyone can create a pending order
+      // Anyone can create a new order (must start in Pending status)
       allow create: if request.resource.data.status == "Pending";
-      
-      // Only admins can read, update or delete orders
-      allow read, update, delete: if isAdmin();
+
+      // Anyone can read a single order by ID (students tracking their own order from any device)
+      allow get: if true;
+
+      // Only admins can list all orders, update status, or delete
+      allow list, update, delete: if isAdmin();
     }
 
-    // Other collections (gateways, pricing, etc.) only accessible by admin
+    // Public pricing configuration so students on any device get current rates
+    match /pricing/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Other collections (users, etc.) only accessible by admin
     match /{document=**} {
       allow read, write: if isAdmin();
     }

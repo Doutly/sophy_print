@@ -42,7 +42,7 @@ function QueuePage() {
     return matchesQuery && matchesStatus;
   });
 
-  const activeCount = jobs.filter((j) => j.status === "Printing" || j.status === "Waiting").length;
+  const activeCount = jobs.filter((j) => j.status === "Printing" || j.status === "Waiting" || j.status === "Pending").length;
 
   return (
     <AdminShell
@@ -70,7 +70,7 @@ function QueuePage() {
           </div>
 
           <div className="flex overflow-x-auto rounded-lg border border-border bg-card p-0.5 shadow-xs">
-            {["all", "Printing", "Waiting", "Ready", "Completed"].map((s) => (
+            {["all", "Pending", "Waiting", "Printing", "Ready", "Completed"].map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
@@ -127,6 +127,16 @@ function QueuePage() {
                     <StatusBadge status={job.status} />
                   </div>
                   <div className="flex items-center justify-end gap-1.5">
+                    {job.status === "Pending" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px] px-2 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
+                        onClick={() => handleStatusChange(job.id, "Waiting")}
+                      >
+                        Acknowledge
+                      </Button>
+                    )}
                     {job.status === "Waiting" && (
                       <Button
                         variant="outline"
@@ -180,6 +190,7 @@ function QueuePage() {
 
 function StatusBadge({ status }: { status: JobStatus }) {
   const styles: Record<JobStatus, string> = {
+    Pending: "bg-amber-500/10 text-amber-600 border border-amber-500/20",
     Printing: "bg-info/10 text-info border border-info/20",
     Ready: "bg-primary/10 text-primary border border-primary/20",
     Completed: "bg-secondary text-muted-foreground border border-border",

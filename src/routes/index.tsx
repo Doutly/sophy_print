@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, FileText, Minus, Plus, Printer, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -10,10 +10,12 @@ import { detectPdfPageCount } from "@/lib/pdf-detector";
 import {
   calculateJobPrice,
   createPrintOrder,
-  getPricingConfig,
+  defaultPricingConfig,
+  loadPricingConfig,
   parsePageRange,
   validatePrintableFile,
   type PrintJob,
+  type PricingConfig,
 } from "@/lib/print-data";
 
 export const Route = createFileRoute("/")({
@@ -59,6 +61,16 @@ function StudentPrintFlow() {
   const [paying, setPaying] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<PrintJob | null>(null);
 
+  // Student identity (optional, for pickup contact)
+  const [studentName, setStudentName] = useState("");
+  const [studentPhone, setStudentPhone] = useState("");
+
+  // Pricing — load from Firestore on mount, fall back to cached/default
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(defaultPricingConfig);
+  useEffect(() => {
+    loadPricingConfig().then(setPricingConfig);
+  }, []);
+
   // Page range calculation
   const parsedRange = useMemo(() => {
     if (pageSelection === "all") {
@@ -75,8 +87,7 @@ function StudentPrintFlow() {
 
   const activePages = parsedRange.isValid ? parsedRange.count : detectedTotalPages;
 
-  // Real pricing calculation
-  const pricingConfig = useMemo(() => getPricingConfig(), []);
+  // Real pricing calculation using live Firestore config
   const priceDetails = useMemo(() => {
     return calculateJobPrice(activePages, copies, mode, sides, paper, pricingConfig);
   }, [activePages, copies, mode, sides, paper, pricingConfig]);
@@ -149,8 +160,8 @@ function StudentPrintFlow() {
         copies,
         amount: total,
         status: "Pending",
-        student: "Campus Student",
-        phone: "Self-Pickup",
+        student: studentName.trim() || "Anonymous",
+        phone: studentPhone.trim() || undefined,
         pickupCode: Math.floor(1000 + Math.random() * 9000).toString(),
         sides,
         paper,
@@ -626,9 +637,32 @@ function StudentPrintFlow() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-foreground">
-              <ShieldCheck className="size-4 text-primary shrink-0" />
-              <span>Simulated Payment Gateway: Orders auto-dispatch to cloud queue and shop printer.</span>
+            {/* Optional contact for pickup */}
+            <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
+              <div>
+                <p className="font-display font-semibold text-sm text-foreground">Contact for pickup <span className="font-normal text-muted-foreground">(optional)</span></p>
+                <p className="text-xs text-muted-foreground mt-0.5">So the shop can call you when your print is ready.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  placeholder="Your name"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  className="bg-background text-xs h-10"
+                />
+                <Input
+                  placeholder="Phone number"
+                  value={studentPhone}
+                  onChange={(e) => setStudentPhone(e.target.value)}
+                  className="bg-background text-xs h-10"
+                  type="tel"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-foreground">
+              <ShieldCheck className="size-4 text-amber-500 shrink-0" />
+              <span>Payment is collected at the print counter when you pick up your document.</span>
             </div>
 
             <div className="flex justify-between pt-2">
@@ -636,7 +670,7 @@ function StudentPrintFlow() {
                 <ChevronLeft className="size-4" /> Back
               </Button>
               <Button size="lg" disabled={paying} onClick={handlePayment} className="gap-2 shadow-xs">
-                {paying ? "Dispatching Order…" : `Pay ₹${total} (UPI / Card)`}
+                {paying ? "Submitting Order…" : "Submit Print Order"}
               </Button>
             </div>
           </section>

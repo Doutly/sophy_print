@@ -7,9 +7,10 @@ service firebase.storage {
     }
 
     match /orders/pending/{fileId} {
-      // Anyone can upload a file to the pending folder if it meets criteria
-      allow write: if request.resource.size < 50 * 1024 * 1024 // 50MB max
-                   && request.resource.contentType.matches('application/pdf|application/vnd.openxmlformats-officedocument.*|application/msword');
+      // Anyone can upload a printable document to the pending folder (50MB max)
+      allow write: if request.resource.size < 50 * 1024 * 1024;
+      // Allow reading so that download URLs work for preview and printing
+      allow read: if true;
     }
 
     // Admins can read, write, and delete any file (including processed orders)

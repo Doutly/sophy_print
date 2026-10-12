@@ -108,8 +108,14 @@ function OrdersPage() {
                     <td className="p-4 font-mono text-xs font-semibold text-primary">{job.pickupCode}</td>
                     <td className="p-4 font-semibold text-foreground">₹{job.amount}</td>
                     <td className="p-4">
-                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                        Paid
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          job.status === "Completed"
+                            ? "bg-primary/10 text-primary"
+                            : "bg-amber-500/10 text-amber-600"
+                        }`}
+                      >
+                        {job.status === "Completed" ? "Paid" : "Pay at counter"}
                       </span>
                     </td>
                     <td className="p-4">

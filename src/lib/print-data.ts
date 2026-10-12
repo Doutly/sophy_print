@@ -11,7 +11,7 @@ import {
 import { deleteObject, ref } from "firebase/storage";
 import { db, storage } from "./firebase";
 
-export type JobStatus = "Waiting" | "Printing" | "Ready" | "Completed" | "Failed" | "Paused" | "Purged";
+export type JobStatus = "Pending" | "Waiting" | "Printing" | "Ready" | "Completed" | "Failed" | "Paused" | "Purged";
 
 export type PrintJob = {
   id: string;
@@ -57,7 +57,6 @@ export const defaultPricingConfig: PricingConfig = {
 };
 
 const PRICING_STORAGE_KEY = "sophy_print_pricing_v1";
-const JOBS_STORAGE_KEY = "sophy_print_jobs_v1";
 
 export function getPricingConfig(): PricingConfig {
   if (typeof window === "undefined") return defaultPricingConfig;
@@ -74,13 +73,34 @@ export function savePricingConfig(config: PricingConfig): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(config));
-    // Asynchronously sync to Firestore
-    setDoc(doc(db, "pricing", "current"), config).catch(() => {
-      // offline fallback
+    // Sync to Firestore (primary source of truth for pricing)
+    setDoc(doc(db, "pricing", "current"), config).catch((err) => {
+      console.warn("Failed to sync pricing to Firestore:", err);
     });
   } catch (err) {
     console.warn("Failed to save pricing config", err);
   }
+}
+
+/**
+ * Async pricing loader — fetches from Firestore first, falls back to localStorage cache.
+ * Call this on app mount instead of the synchronous getPricingConfig().
+ */
+export async function loadPricingConfig(): Promise<PricingConfig> {
+  try {
+    const snap = await getDoc(doc(db, "pricing", "current"));
+    if (snap.exists()) {
+      const data = { ...defaultPricingConfig, ...(snap.data() as Partial<PricingConfig>) };
+      // Keep localStorage in sync as a warm cache for offline
+      if (typeof window !== "undefined") {
+        localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(data));
+      }
+      return data;
+    }
+  } catch (err) {
+    console.info("Firestore pricing fetch failed, using local cache:", err);
+  }
+  return getPricingConfig();
 }
 
 // Pure zero mock data: initial state is empty
@@ -88,30 +108,13 @@ export const initialPrintJobs: PrintJob[] = [];
 export let printJobs: PrintJob[] = [];
 
 export function getStoredPrintJobs(): PrintJob[] {
-  if (typeof window === "undefined") return printJobs;
-  try {
-    const raw = localStorage.getItem(JOBS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        printJobs = parsed;
-        return printJobs;
-      }
-    }
-  } catch (err) {
-    console.warn("Failed reading print jobs from storage", err);
-  }
+  // In-memory session cache only — Firestore is the source of truth for orders
   return printJobs;
 }
 
 export function saveStoredPrintJobs(jobs: PrintJob[]): void {
+  // Update in-memory cache only — no localStorage persistence for orders
   printJobs = jobs;
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
-  } catch (err) {
-    console.warn("Failed saving print jobs to storage", err);
-  }
 }
 
 /**
@@ -183,9 +186,8 @@ export async function fetchFirestoreOrders(): Promise<PrintJob[]> {
 }
 
 export async function createPrintOrder(order: Omit<PrintJob, "id" | "placed"> & { id?: string }): Promise<PrintJob> {
-  const currentJobs = getStoredPrintJobs();
-  const nextNum = currentJobs.length + 1001;
-  const id = order.id || `P${nextNum}`;
+  // Use a timestamp-based ID that is unique across devices
+  const id = order.id || `P${Date.now().toString(36).toUpperCase()}`;
   const now = new Date();
   const isoStr = now.toISOString();
   const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -198,15 +200,11 @@ export async function createPrintOrder(order: Omit<PrintJob, "id" | "placed"> & 
     pickupCode: order.pickupCode || Math.floor(1000 + Math.random() * 9000).toString(),
   };
 
-  const updated = [newJob, ...currentJobs];
-  saveStoredPrintJobs(updated);
+  // Firestore is the primary source of truth — write here first
+  await setDoc(doc(db, "orders", id), newJob);
 
-  // Direct Firestore document insertion
-  try {
-    await setDoc(doc(db, "orders", id), newJob);
-  } catch (err) {
-    console.info("Firestore order synced locally:", err);
-  }
+  // Update in-memory session cache so admin UI reflects the change immediately
+  printJobs = [newJob, ...printJobs];
 
   return newJob;
 }
@@ -327,17 +325,47 @@ export async function deleteOrderCompletely(jobId: string, storagePath?: string)
 export async function fetchOrderById(id: string): Promise<PrintJob | undefined> {
   const cleanId = id.replace("#", "").trim().toUpperCase();
 
-  try {
-    const snap = await getDoc(doc(db, "orders", cleanId));
-    if (snap.exists()) {
-      return snap.data() as PrintJob;
-    }
-  } catch {
-    // network fallback to local
+  // Firestore is the source of truth — no localStorage fallback for cross-device correctness
+  const snap = await getDoc(doc(db, "orders", cleanId));
+  if (snap.exists()) {
+    return snap.data() as PrintJob;
   }
+  return undefined;
+}
 
-  const local = getStoredPrintJobs().find((j) => j.id.toUpperCase() === cleanId);
-  return local;
+/**
+ * Real-time listener for a single order, allowing live timeline updates on student mobile devices
+ */
+export function subscribeToOrderById(
+  id: string,
+  callback: (job: PrintJob | null) => void
+): () => void {
+  const cleanId = id.replace("#", "").trim().toUpperCase();
+  if (!cleanId) {
+    callback(null);
+    return () => {};
+  }
+  try {
+    const unsub = onSnapshot(
+      doc(db, "orders", cleanId),
+      (snap) => {
+        if (snap.exists()) {
+          callback(snap.data() as PrintJob);
+        } else {
+          callback(null);
+        }
+      },
+      (err) => {
+        console.warn("Could not subscribe to order:", err);
+        callback(null);
+      }
+    );
+    return unsub;
+  } catch (err) {
+    console.warn("Error setting up order subscription:", err);
+    callback(null);
+    return () => {};
+  }
 }
 
 /**

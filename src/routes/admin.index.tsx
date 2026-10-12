@@ -32,7 +32,7 @@ function OverviewPage() {
   const liveStats = useMemo(() => {
     const revenue = jobs.reduce((acc, j) => acc + (j.amount || 0), 0);
     const pages = jobs.reduce((acc, j) => acc + (j.pages || 0) * (j.copies || 1), 0);
-    const active = jobs.filter((j) => j.status === "Printing" || j.status === "Waiting").length;
+    const active = jobs.filter((j) => j.status === "Printing" || j.status === "Waiting" || j.status === "Pending").length;
 
     return [
       {

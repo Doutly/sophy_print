@@ -3,7 +3,7 @@ import { Check, CheckCircle2, ChevronLeft, CircleDot, Clock3, PackageCheck, Prin
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetchOrderById, getStoredPrintJobs, type PrintJob } from "@/lib/print-data";
+import { fetchOrderById, getStoredPrintJobs, subscribeToOrderById, type PrintJob } from "@/lib/print-data";
 
 export const Route = createFileRoute("/track")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -32,21 +32,28 @@ interface TimelineItem {
 function TrackPage() {
   const search = Route.useSearch();
   const [query, setQuery] = useState(search.order ?? "");
+  const [activeOrderId, setActiveOrderId] = useState(search.order ?? "");
   const [shown, setShown] = useState(Boolean(search.order));
   const [matchedJob, setMatchedJob] = useState<PrintJob | null>(null);
   const [searching, setSearching] = useState(false);
 
-  const lookupOrder = async (orderId: string) => {
-    if (!orderId.trim()) return;
+  useEffect(() => {
+    if (!activeOrderId.trim()) {
+      setMatchedJob(null);
+      return;
+    }
     setSearching(true);
-    const job = await fetchOrderById(orderId);
-    setMatchedJob(job || null);
-    setSearching(false);
-  };
+    const unsub = subscribeToOrderById(activeOrderId, (job) => {
+      setMatchedJob(job);
+      setSearching(false);
+    });
+    return () => unsub();
+  }, [activeOrderId]);
 
   useEffect(() => {
     if (search.order) {
-      lookupOrder(search.order);
+      setQuery(search.order);
+      setActiveOrderId(search.order);
       setShown(true);
     }
   }, [search.order]);
@@ -54,37 +61,45 @@ function TrackPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      lookupOrder(query);
+      setActiveOrderId(query.trim());
       setShown(true);
     }
   };
 
   const isReady = matchedJob?.status === "Ready" || matchedJob?.status === "Completed";
-  const isPrinting = matchedJob?.status === "Printing";
+  const isPrinting = matchedJob?.status === "Printing" || isReady;
+  const isAcknowledged = matchedJob?.status !== "Pending";
 
   const timelineSteps: TimelineItem[] = matchedJob
     ? [
         {
           icon: CheckCircle2,
-          label: "Payment confirmed",
-          detail: matchedJob.placed ? `Paid at ${matchedJob.placed}` : "Payment confirmed",
+          label: "Order received",
+          detail: matchedJob.placed ? `Submitted at ${matchedJob.placed}` : "Order received",
           active: true,
         },
         {
           icon: Check,
-          label: "Dispatched to print queue",
-          detail: matchedJob.printer || "Campus Printer",
-          active: true,
+          label: "Shop acknowledgement",
+          detail:
+            matchedJob.status === "Pending"
+              ? "Awaiting print counter confirmation"
+              : `Dispatched to ${matchedJob.printer || "shop printer"}`,
+          active: isAcknowledged,
         },
         {
           icon: CircleDot,
           label: isReady ? "Printing completed" : "Printing in progress",
-          detail: isReady ? "Finished printing" : "In physical printer tray",
-          active: true,
+          detail: isReady
+            ? "Finished printing"
+            : matchedJob.status === "Printing"
+            ? "Document printing on machine tray"
+            : "In print queue",
+          active: isPrinting,
         },
         {
           icon: PackageCheck,
-          label: isReady ? "Ready for pickup!" : "Awaiting pickup counter",
+          label: isReady ? "Ready for pickup!" : "Pickup counter",
           detail: isReady ? "Collect document now" : "Estimated wait 5–8 min",
           active: isReady,
         },
