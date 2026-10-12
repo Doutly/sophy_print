@@ -190,39 +190,43 @@ export async function fetchFirestoreOrders(): Promise<PrintJob[]> {
 
 /**
  * Generates a collision-free 4-digit pickup code & order ID (1000–9999).
- * Checks active orders in Firestore and localStorage so no two active uncollected orders collide.
+ * Uses getDoc (allowed by Firestore rules `allow get: if true`) to ensure no permission errors.
  */
 export async function generateUniquePickupCode(): Promise<string> {
   const activeStatuses = ["Pending", "Waiting", "Printing", "Ready"];
   let candidate = Math.floor(1000 + Math.random() * 9000).toString();
 
-  try {
-    const ordersCol = collection(db, "orders");
-    const activeQuery = query(ordersCol, where("status", "in", activeStatuses));
-    const snap = await getDocs(activeQuery);
-    const occupiedCodes = new Set<string>();
+  // Check local cache first
+  const localOccupied = new Set(
+    getStoredPrintJobs()
+      .filter((j) => activeStatuses.includes(j.status))
+      .map((j) => (j.id || j.pickupCode || "").toString().toUpperCase())
+  );
 
-    snap.forEach((d) => {
-      const data = d.data() as PrintJob;
-      if (data.id) occupiedCodes.add(data.id.toString().toUpperCase());
-      if (data.pickupCode) occupiedCodes.add(data.pickupCode.toString().toUpperCase());
-    });
-
-    // Also check local cache
-    getStoredPrintJobs().forEach((j) => {
-      if (activeStatuses.includes(j.status)) {
-        if (j.id) occupiedCodes.add(j.id.toString().toUpperCase());
-        if (j.pickupCode) occupiedCodes.add(j.pickupCode.toString().toUpperCase());
-      }
-    });
-
-    let attempts = 0;
-    while (occupiedCodes.has(candidate) && attempts < 30) {
+  let attempts = 0;
+  while (attempts < 10) {
+    if (localOccupied.has(candidate)) {
       candidate = Math.floor(1000 + Math.random() * 9000).toString();
       attempts++;
+      continue;
     }
-  } catch (err) {
-    console.warn("Could not check active codes collision:", err);
+
+    try {
+      // getDoc is explicitly permitted for all students by `allow get: if true;`
+      const docSnap = await getDoc(doc(db, "orders", candidate));
+      if (docSnap.exists()) {
+        const data = docSnap.data() as PrintJob;
+        if (activeStatuses.includes(data.status)) {
+          candidate = Math.floor(1000 + Math.random() * 9000).toString();
+          attempts++;
+          continue;
+        }
+      }
+      // Candidate is fresh or inactive, safe to use!
+      break;
+    } catch {
+      break;
+    }
   }
 
   return candidate;
