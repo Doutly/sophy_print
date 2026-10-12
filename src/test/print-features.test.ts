@@ -165,11 +165,11 @@ describe("Printer Hardware Inventory & Dual Canon 4545i III Setup", () => {
     const { defaultPrinters } = await import("@/lib/print-data");
     const canonUnits = defaultPrinters.filter((p) => p.model?.includes("4545i"));
     expect(canonUnits).toHaveLength(2);
-    expect(canonUnits[0].name).toContain("Unit 1");
-    expect(canonUnits[1].name).toContain("Unit 2");
-    expect(canonUnits[0].connection).toContain("LAN");
-    expect(canonUnits[1].connection).toContain("LAN");
-    expect(canonUnits[0].speed).toBe("45 PPM");
+    expect(canonUnits[0]?.name).toContain("Unit 1");
+    expect(canonUnits[1]?.name).toContain("Unit 2");
+    expect(canonUnits[0]?.connection).toContain("LAN");
+    expect(canonUnits[1]?.connection).toContain("LAN");
+    expect(canonUnits[0]?.speed).toBe("45 PPM");
   });
 });
 

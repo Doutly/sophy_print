@@ -228,7 +228,12 @@ export async function generateUniquePickupCode(): Promise<string> {
   return candidate;
 }
 
-export async function createPrintOrder(order: Omit<PrintJob, "id" | "placed"> & { id?: string }): Promise<PrintJob> {
+export async function createPrintOrder(
+  order: Omit<PrintJob, "id" | "placed" | "pickupCode"> & {
+    id?: string;
+    pickupCode?: string;
+  }
+): Promise<PrintJob> {
   // Use the exact same 4-digit number for BOTH the Order ID and the Pickup Code
   const code = order.id || order.pickupCode || (await generateUniquePickupCode());
   const id = code;
@@ -398,8 +403,9 @@ export async function fetchOrderById(id: string): Promise<PrintJob | undefined> 
     const ordersCol = collection(db, "orders");
     const q = query(ordersCol, where("pickupCode", "==", cleanId));
     const querySnap = await getDocs(q);
-    if (!querySnap.empty) {
-      return querySnap.docs[0].data() as PrintJob;
+    const firstDoc = querySnap.docs[0];
+    if (firstDoc) {
+      return firstDoc.data() as PrintJob;
     }
   } catch (err) {
     console.warn("Pickup code query error:", err);
@@ -446,8 +452,9 @@ export function subscribeToOrderById(
               queryUnsub = onSnapshot(
                 q,
                 (qSnap) => {
-                  if (!qSnap.empty) {
-                    callback(qSnap.docs[0].data() as PrintJob);
+                  const firstDoc = qSnap.docs[0];
+                  if (firstDoc) {
+                    callback(firstDoc.data() as PrintJob);
                   } else {
                     // Check local cache as final fallback
                     const local = getStoredPrintJobs().find(
