@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin/machines")({
       { title: "Machines & Print Agent — Sophy Print" },
       { name: "description", content: "Printer status and Windows Doutly Print Agent installer." },
       { property: "og:title", content: "Machines & Print Agent — Sophy Print" },
-      { property: "og:description", content: "Download Doutly Print Agent and monitor Kyocera & Epson hardware." },
+      { property: "og:description", content: "Download Doutly Print Agent and monitor Dual Canon imageRUNNER ADVANCE 4545i III & Epson hardware." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -27,8 +27,9 @@ interface GatewayData {
   status: string;
   lastSeen?: string;
   printers?: {
-    bw?: { name: string; status: string };
-    colour?: { name: string; status: string };
+    bw?: { name: string; status: string; connection?: string };
+    bw_secondary?: { name: string; status: string; connection?: string };
+    colour?: { name: string; status: string; connection?: string };
   };
 }
 
@@ -97,8 +98,13 @@ echo     "appId": "1:102832836431:web:6cf61ae6daac1d9b02ff3a",
 echo     "measurementId": "G-0NPXYHVKVS"
 echo   },
 echo   "printers": {
-echo     "bw": "Kyocera MZ3200i",
+echo     "bw": "Canon iR-ADV 4545i III (Unit 1)",
+echo     "bw_secondary": "Canon iR-ADV 4545i III (Unit 2)",
 echo     "colour": "Epson L5290"
+echo   },
+echo   "loadBalancing": {
+echo     "enabled": true,
+echo     "strategy": "round-robin"
 echo   },
 echo   "pollIntervalSeconds": 3,
 echo   "heartbeatIntervalSeconds": 15
@@ -181,7 +187,7 @@ pause
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
                   Listens to the cloud Firebase queue, automatically downloads student PDFs, and
-                  submits print jobs to Kyocera and Epson spoolers with zero staff intervention.
+                  submits print jobs to Dual Canon imageRUNNER ADVANCE 4545i III (LAN) and Epson spoolers with zero staff intervention.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
                   <span className="flex items-center gap-1.5 font-medium">
@@ -206,53 +212,70 @@ pause
         </section>
 
         {/* Physical Printer Cards */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {defaultPrinters.map((machine) => {
             const machineJobs = jobs.filter(
-              (j) => j.printer?.includes(machine.name) || (machine.type === "bw" ? j.type === "B&W" : j.type === "Colour")
+              (j) =>
+                j.printer?.includes(machine.name) ||
+                (machine.type === "bw"
+                  ? j.type === "B&W" || j.printer?.includes("Canon")
+                  : j.type === "Colour" || j.printer?.includes("Epson"))
             );
             const inQueue = machineJobs.filter((j) => j.status === "Printing" || j.status === "Waiting").length;
             const completedJobs = machineJobs.filter((j) => j.status === "Completed" || j.status === "Ready").length;
 
             return (
-              <article key={machine.name} className="rounded-xl border border-border bg-card p-6 shadow-xs">
-                <div className="flex items-start justify-between">
-                  <span className="grid size-12 place-items-center rounded-xl bg-secondary text-foreground">
-                    <Printer className="size-5" />
-                  </span>
-                  <span
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
-                      isGatewayActive
-                        ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
-                        : "border-border bg-secondary/50 text-muted-foreground"
-                    }`}
-                  >
+              <article key={machine.name} className="flex flex-col justify-between rounded-xl border border-border bg-card p-6 shadow-xs">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <span className="grid size-12 place-items-center rounded-xl bg-secondary text-foreground">
+                      <Printer className="size-5" />
+                    </span>
                     <span
-                      className={`size-2 rounded-full ${
-                        isGatewayActive ? "bg-emerald-500 shadow-xs" : "bg-muted-foreground"
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        isGatewayActive
+                          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+                          : "border-border bg-secondary/50 text-muted-foreground"
                       }`}
-                    />
-                    {isGatewayActive ? "Online & Ready" : "Standby (Agent Offline)"}
-                  </span>
+                    >
+                      <span
+                        className={`size-2 rounded-full ${
+                          isGatewayActive ? "bg-emerald-500 shadow-xs" : "bg-muted-foreground"
+                        }`}
+                      />
+                      {isGatewayActive ? "Online & Ready" : "Standby (Agent Offline)"}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 flex items-center gap-2">
+                    <h2 className="font-display text-lg font-bold tracking-tight text-foreground">{machine.name}</h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{machine.role}</p>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-[11px] font-semibold text-secondary-foreground">
+                      {machine.connection}
+                    </span>
+                    <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                      {machine.speed}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-3 gap-2 border-y border-border py-4 text-center">
+                    <Metric label="Jobs recorded" value={machineJobs.length} />
+                    <Metric label="In queue" value={inQueue} />
+                    <Metric label="Completed" value={completedJobs} />
+                  </div>
                 </div>
 
-                <h2 className="mt-5 font-display text-xl font-bold tracking-tight text-foreground">{machine.name}</h2>
-                <p className="text-xs text-muted-foreground">{machine.role}</p>
-
-                <div className="mt-6 grid grid-cols-3 gap-3 border-y border-border py-4">
-                  <Metric label="Jobs recorded" value={machineJobs.length} />
-                  <Metric label="In queue" value={inQueue} />
-                  <Metric label="Completed" value={completedJobs} />
-                </div>
-
-                <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+                <div className="mt-4 flex flex-col gap-2 pt-2 border-t border-border/60 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <Clock3 className="size-3.5 text-primary" />
                     {isGatewayActive ? "Windows Spooler: Connected" : "Windows Spooler: Awaiting Agent"}
                   </span>
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                    <Cpu className="size-3" />
-                    {machine.driver}
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground truncate" title={machine.driver}>
+                    <Cpu className="size-3 shrink-0" />
+                    <span className="truncate">{machine.driver}</span>
                   </span>
                 </div>
               </article>

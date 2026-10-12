@@ -103,8 +103,8 @@ function PricingPage() {
                   <Printer className="size-4" />
                 </span>
                 <div>
-                  <h3 className="font-display font-semibold text-foreground">Black & White (Kyocera MZ3200i)</h3>
-                  <p className="text-xs text-muted-foreground">High-speed monochrome laser printing</p>
+                  <h3 className="font-display font-semibold text-foreground">Black & White (Dual Canon imageRUNNER ADVANCE 4545i III)</h3>
+                  <p className="text-xs text-muted-foreground">High-speed 45 PPM monochrome xerox copiers (LAN Connected)</p>
                 </div>
               </div>
 

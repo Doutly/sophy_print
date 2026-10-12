@@ -2,7 +2,8 @@
  * Doutly Print Gateway Agent
  * Runs as a lightweight Windows service/daemon on the shop's existing PC.
  * Listens to Firebase Cloud Queue, downloads PDFs, and submits print jobs
- * directly to the Kyocera MZ3200i and Epson L5290 Windows spoolers.
+ * directly to the Dual Canon imageRUNNER ADVANCE 4545i III (LAN Connected)
+ * and Epson L5290 Windows spoolers.
  */
 
 const fs = require("fs");
@@ -25,9 +26,13 @@ if (!fs.existsSync(tempDir)) {
 }
 
 console.log("\n========================================================");
-console.log("🖨️  Doutly Print Gateway Agent v2.4");
+console.log("🖨️  Doutly Print Gateway Agent v2.5");
 console.log(`📍 Gateway ID: ${config.gatewayId} | Shop: ${config.shopName}`);
-console.log(`🖨️  B&W Printer: ${config.printers.bw}`);
+console.log(`🖨️  Canon Unit 1 (LAN B&W): ${config.printers.bw}`);
+if (config.printers.bw_secondary) {
+  console.log(`🖨️  Canon Unit 2 (LAN B&W): ${config.printers.bw_secondary}`);
+  console.log(`⚖️  Load Balancing: Active (${config.loadBalancing?.strategy || "round-robin"})`);
+}
 console.log(`🎨 Colour Printer: ${config.printers.colour}`);
 console.log("========================================================\n");
 
@@ -40,6 +45,8 @@ const db = getFirestore(app);
 
 // Keep track of jobs in progress to prevent duplicate printing
 const processingJobs = new Set();
+// Toggle for round-robin between the two Canon 4545i III LAN printers
+let bwRoundRobinIndex = 0;
 
 /**
  * Downloads a file from a URL to a local path
@@ -75,7 +82,7 @@ function downloadFile(url, destPath) {
  */
 function printDocumentToPrinter(filePath, printerName) {
   return new Promise((resolve) => {
-    console.log(`[PRINT] 🖨️ Submitting "${path.basename(filePath)}" to printer "${printerName}"...`);
+    console.log(`[PRINT] 🖨️ Submitting "${path.basename(filePath)}" to printer "${printerName}" (LAN Spooler)...`);
 
     // Use Windows PowerShell to dispatch to the named Windows printer driver
     const psCommand = `Start-Process -FilePath "${filePath}" -Verb PrintTo -ArgumentList '"${printerName}"' -PassThru | Out-Null`;
@@ -85,7 +92,7 @@ function printDocumentToPrinter(filePath, printerName) {
         console.warn(`[PRINT WARNING] Windows PrintTo command notice: ${error.message}`);
         // Often on Windows, the print dialog completes via default association
       }
-      console.log(`[PRINT SUCCESS] ✓ Job successfully received by Windows Print Spooler.`);
+      console.log(`[PRINT SUCCESS] ✓ Job successfully received by Windows Print Spooler for "${printerName}".`);
       resolve(true);
     });
   });
@@ -104,8 +111,24 @@ function startHeartbeat() {
         status: "Online",
         lastSeen: new Date().toISOString(),
         printers: {
-          bw: { name: config.printers.bw, status: "Ready" },
-          colour: { name: config.printers.colour, status: "Ready" },
+          bw: {
+            name: config.printers.bw,
+            model: "Canon imageRUNNER ADVANCE 4545i III",
+            connection: "LAN (Gigabit Ethernet)",
+            status: "Ready",
+          },
+          bw_secondary: {
+            name: config.printers.bw_secondary || config.printers.bw,
+            model: "Canon imageRUNNER ADVANCE 4545i III",
+            connection: "LAN (Gigabit Ethernet)",
+            status: "Ready",
+          },
+          colour: {
+            name: config.printers.colour,
+            model: "Epson L5290",
+            connection: "USB / LAN",
+            status: "Ready",
+          },
         },
       }, { merge: true });
       // console.log(`[HEARTBEAT] ❤️ Ping sent to Firebase (${new Date().toLocaleTimeString()})`);
@@ -140,12 +163,29 @@ function listenToPrintQueue() {
 
         // Determine destination printer
         const isColour = orderData.type === "Colour";
-        const printerTarget = isColour ? config.printers.colour : config.printers.bw;
+        let printerTarget;
+
+        if (isColour) {
+          printerTarget = config.printers.colour;
+        } else {
+          // Check if specific unit requested or load-balance across the 2 Canon 4545i III machines
+          if (orderData.printer?.includes("Unit 2")) {
+            printerTarget = config.printers.bw_secondary || config.printers.bw;
+          } else if (orderData.printer?.includes("Unit 1")) {
+            printerTarget = config.printers.bw;
+          } else if (config.printers.bw_secondary) {
+            // Alternate / round-robin between Unit 1 and Unit 2
+            bwRoundRobinIndex = (bwRoundRobinIndex + 1) % 2;
+            printerTarget = bwRoundRobinIndex === 0 ? config.printers.bw : config.printers.bw_secondary;
+          } else {
+            printerTarget = config.printers.bw;
+          }
+        }
 
         console.log(`\n🔔 [NEW JOB RECEIVED] #${orderId}`);
         console.log(`   📄 Document: ${orderData.file}`);
         console.log(`   🔢 Pages: ${orderData.pages} (${orderData.pageRange || "all"}) · Copies: ${orderData.copies || 1}`);
-        console.log(`   🎨 Mode: ${orderData.type} -> ${printerTarget}`);
+        console.log(`   🎨 Mode: ${orderData.type} -> Dispatched to ${printerTarget} (LAN)`);
         console.log(`   🔑 Pickup Code: ${orderData.pickupCode || "N/A"}`);
 
         processingJobs.add(orderId);

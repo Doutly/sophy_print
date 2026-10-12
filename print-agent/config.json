@@ -11,8 +11,14 @@
     "measurementId": "G-0NPXYHVKVS"
   },
   "printers": {
-    "bw": "Kyocera MZ3200i",
+    "bw": "Canon iR-ADV 4545i III (Unit 1)",
+    "bw_secondary": "Canon iR-ADV 4545i III (Unit 2)",
     "colour": "Epson L5290"
+  },
+  "loadBalancing": {
+    "enabled": true,
+    "strategy": "round-robin",
+    "comment": "Evenly balances high-volume B&W xerox queue across both LAN-connected Canon 4545i III machines"
   },
   "pollIntervalSeconds": 3,
   "heartbeatIntervalSeconds": 15

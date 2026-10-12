@@ -84,7 +84,13 @@ function RevenuePage() {
 
   // Machine breakdown
   const machineBreakdown = useMemo(() => {
-    const bwJobs = filteredJobs.filter((j) => j.type === "B&W" || j.printer?.includes("Kyocera"));
+    const bwJobs = filteredJobs.filter(
+      (j) =>
+        j.type === "B&W" ||
+        j.printer?.includes("Canon") ||
+        j.printer?.includes("4545i") ||
+        j.printer?.includes("Kyocera")
+    );
     const colourJobs = filteredJobs.filter((j) => j.type === "Colour" || j.printer?.includes("Epson"));
 
     const bwRevenue = bwJobs.reduce((acc, j) => acc + (j.amount || 0), 0);
@@ -95,7 +101,7 @@ function RevenuePage() {
     const colourPages = colourJobs.reduce((acc, j) => acc + (j.pages || 0) * (j.copies || 1), 0);
 
     return {
-      kyocera: {
+      canonBw: {
         revenue: bwRevenue,
         jobs: bwJobs.length,
         pages: bwPages,
@@ -269,30 +275,30 @@ function RevenuePage() {
               </div>
 
               <div className="mt-6 space-y-5">
-                {/* Kyocera */}
+                {/* Canon imageRUNNER ADVANCE 4545i III Dual Xerox */}
                 <div className="rounded-lg border border-border bg-secondary/30 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-display text-sm font-semibold text-foreground">Kyocera MZ3200i</p>
-                      <p className="text-xs text-muted-foreground">Monochrome volume printing</p>
+                      <p className="font-display text-sm font-semibold text-foreground">Canon imageRUNNER ADVANCE 4545i III</p>
+                      <p className="text-xs text-muted-foreground">Dual LAN monochrome xerox copiers (45 PPM)</p>
                     </div>
                     <span className="font-display text-lg font-bold text-foreground">
-                      ₹{machineBreakdown.kyocera.revenue.toLocaleString("en-IN")}
+                      ₹{machineBreakdown.canonBw.revenue.toLocaleString("en-IN")}
                     </span>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
                       <div
                         className="h-full bg-foreground rounded-full"
-                        style={{ width: `${machineBreakdown.kyocera.percentage}%` }}
+                        style={{ width: `${machineBreakdown.canonBw.percentage}%` }}
                       />
                     </div>
                     <span className="text-xs font-semibold text-foreground">
-                      {machineBreakdown.kyocera.percentage}%
+                      {machineBreakdown.canonBw.percentage}%
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    {machineBreakdown.kyocera.jobs} jobs · {machineBreakdown.kyocera.pages} pages
+                    {machineBreakdown.canonBw.jobs} jobs · {machineBreakdown.canonBw.pages} pages
                   </p>
                 </div>
 

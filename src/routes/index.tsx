@@ -165,7 +165,7 @@ function StudentPrintFlow() {
         pickupCode: Math.floor(1000 + Math.random() * 9000).toString(),
         sides,
         paper,
-        printer: mode === "bw" ? "Kyocera MZ3200i" : "Epson L5290",
+        printer: mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III" : "Epson L5290",
         downloadUrl,
         storagePath,
       });
@@ -479,7 +479,7 @@ function StudentPrintFlow() {
                   selected={mode === "bw"}
                   onClick={() => setMode("bw")}
                   label="Black & White"
-                  detail="Fast & economical laser (Kyocera MZ3200i)"
+                  detail="Fast & economical xerox (Dual Canon imageRUNNER ADVANCE 4545i III)"
                 />
                 <Choice
                   selected={mode === "colour"}
@@ -560,7 +560,7 @@ function StudentPrintFlow() {
               <div className="mt-4 space-y-2 border-t border-primary/20 pt-3 text-xs">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Routing machine</span>
-                  <span className="font-medium text-foreground">{mode === "bw" ? "Kyocera MZ3200i" : "Epson L5290"}</span>
+                  <span className="font-medium text-foreground">{mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Selected pages</span>
@@ -612,7 +612,7 @@ function StudentPrintFlow() {
                   ["Copies", `${copies} copy`],
                   ["Mode", mode === "bw" ? "Black & White" : "Colour"],
                   ["Selected Pages", parsedRange.displayText],
-                  ["Assigned Machine", mode === "bw" ? "Kyocera MZ3200i" : "Epson L5290"],
+                  ["Assigned Machine", mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <p className="text-muted-foreground">{label}</p>
@@ -688,7 +688,7 @@ function StudentPrintFlow() {
             </h1>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               Order <strong className="text-foreground">#{createdOrder?.id || "P1029"}</strong> is now queued for printing on{" "}
-              {mode === "bw" ? "Kyocera MZ3200i" : "Epson L5290"}.
+              {mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}.
             </p>
 
             <div className="mx-auto mt-8 max-w-sm rounded-xl border border-border bg-card p-6 text-left shadow-xs">

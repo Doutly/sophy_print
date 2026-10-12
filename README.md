@@ -6,7 +6,7 @@ The entire process is automated:
 1. **Students** upload their documents from their phone or laptop, configure settings, and receive a secure pickup code.
 2. **Firebase** securely stores the file and manages the live queue in Firestore.
 3. **Windows Print Gateway Agent** running on the shop's computer listens to the queue, downloads the files, and routes them directly to the physical printers without staff intervention.
-4. **Physical Printers** (Kyocera MZ3200i for High-Speed B&W, Epson L5290 for Precision Colour) execute the print jobs automatically.
+4. **Physical Printers** (Dual Canon imageRUNNER ADVANCE 4545i III for High-Speed B&W Xerox over LAN, Epson L5290 for Precision Colour) execute the print jobs automatically.
 
 ---
 
@@ -32,8 +32,9 @@ graph TD
     D -->|4. Real-time Order Listener| E[Windows Print Gateway Agent]
     E -->|5. Auto-Download PDF| C
     E -->|6. Submit to Windows Spooler| F[Windows Print Spooler]
-    F -->|B&W Jobs| G[Kyocera MZ3200i]
-    F -->|Colour Jobs| H[Epson L5290]
+    F -->|B&W LAN Xerox #1| G[Canon iR-ADV 4545i III Unit 1]
+    F -->|B&W LAN Xerox #2| H[Canon iR-ADV 4545i III Unit 2]
+    F -->|Colour Jobs| I[Epson L5290]
     E -->|7. Mark Ready for Pickup| D
     D -->|8. Real-time Status Update| B
 ```
@@ -112,7 +113,7 @@ Inside `print-agent/` you will find:
 1. **Install Node.js on the shop PC** from [https://nodejs.org/](https://nodejs.org/).
 2. **Verify Printer Names** in Windows:
    - Open **Settings > Bluetooth & devices > Printers & scanners**.
-   - Note the exact names of your printers (e.g. `Kyocera MZ3200i` and `Epson L5290`).
+   - Note the exact names of your printers (e.g. `Canon iR-ADV 4545i III (Unit 1)`, `Canon iR-ADV 4545i III (Unit 2)`, and `Epson L5290`).
 3. **Check `print-agent/config.json`**:
    Ensure the printer names match your Windows printer names:
    ```json
@@ -120,8 +121,13 @@ Inside `print-agent/` you will find:
      "gatewayId": "SHOP-PC-01",
      "shopName": "Campus Xerox & Print Center",
      "printers": {
-       "bw": "Kyocera MZ3200i",
+       "bw": "Canon iR-ADV 4545i III (Unit 1)",
+       "bw_secondary": "Canon iR-ADV 4545i III (Unit 2)",
        "colour": "Epson L5290"
+     },
+     "loadBalancing": {
+       "enabled": true,
+       "strategy": "round-robin"
      },
      "pollIntervalSeconds": 3,
      "heartbeatIntervalSeconds": 15

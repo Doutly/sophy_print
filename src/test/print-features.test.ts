@@ -159,3 +159,17 @@ describe("Production Zero-Mock Policy", () => {
     expect(initialPrintJobs.length).toBe(0);
   });
 });
+
+describe("Printer Hardware Inventory & Dual Canon 4545i III Setup", () => {
+  it("includes dual Canon imageRUNNER ADVANCE 4545i III units connected over LAN", async () => {
+    const { defaultPrinters } = await import("@/lib/print-data");
+    const canonUnits = defaultPrinters.filter((p) => p.model?.includes("4545i"));
+    expect(canonUnits).toHaveLength(2);
+    expect(canonUnits[0].name).toContain("Unit 1");
+    expect(canonUnits[1].name).toContain("Unit 2");
+    expect(canonUnits[0].connection).toContain("LAN");
+    expect(canonUnits[1].connection).toContain("LAN");
+    expect(canonUnits[0].speed).toBe("45 PPM");
+  });
+});
+

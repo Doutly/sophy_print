@@ -473,14 +473,36 @@ export function calculateJobPrice(
 }
 
 export const defaultPrinters = [
-  { name: "Kyocera MZ3200i", role: "High-volume Black & White", type: "bw" as const, driver: "Kyocera KX Driver (Windows Spooler)" },
-  { name: "Epson L5290", role: "High-precision Colour", type: "colour" as const, driver: "Epson ESC/P-R Driver (Windows Spooler)" },
+  {
+    name: "Canon imageRUNNER ADVANCE 4545i III (Unit 1)",
+    role: "High-volume Black & White Xerox (LAN Connected)",
+    type: "bw" as const,
+    driver: "Canon Generic Plus UFR II / PCL6 Driver (LAN)",
+    connection: "LAN (Gigabit Ethernet)",
+    speed: "45 PPM",
+    model: "imageRUNNER ADVANCE 4545i III",
+  },
+  {
+    name: "Canon imageRUNNER ADVANCE 4545i III (Unit 2)",
+    role: "High-volume Black & White Xerox (LAN Connected)",
+    type: "bw" as const,
+    driver: "Canon Generic Plus UFR II / PCL6 Driver (LAN)",
+    connection: "LAN (Gigabit Ethernet)",
+    speed: "45 PPM",
+    model: "imageRUNNER ADVANCE 4545i III",
+  },
+  {
+    name: "Epson L5290",
+    role: "High-precision Colour",
+    type: "colour" as const,
+    driver: "Epson ESC/P-R Driver (Windows Spooler)",
+    connection: "USB / LAN",
+    speed: "10 PPM Colour",
+    model: "EcoTank L5290",
+  },
 ];
 
-export const machines = [
-  { name: "Kyocera MZ3200i", role: "High-volume Black & White", driver: "Kyocera KX Driver (Windows Spooler)" },
-  { name: "Epson L5290", role: "High-precision Colour", driver: "Epson ESC/P-R Driver (Windows Spooler)" },
-];
+export const machines = defaultPrinters;
 
 export const navItems = [
   { label: "Overview", to: "/admin" as const },
