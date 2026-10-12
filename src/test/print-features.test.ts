@@ -173,3 +173,31 @@ describe("Printer Hardware Inventory & Dual Canon 4545i III Setup", () => {
   });
 });
 
+describe("Unified 4-Digit Order ID & Pickup Code", () => {
+  it("generates a clean 4-digit code between 1000 and 9999", async () => {
+    const { generateUniquePickupCode } = await import("@/lib/print-data");
+    const code = await generateUniquePickupCode();
+    expect(code).toMatch(/^[1-9][0-9]{3}$/);
+    expect(code.length).toBe(4);
+  });
+
+  it("assigns the exact same 4-digit code to both order.id and order.pickupCode", async () => {
+    const { createPrintOrder } = await import("@/lib/print-data");
+    const order = await createPrintOrder({
+      file: "TestDoc.pdf",
+      type: "B&W",
+      pages: 5,
+      copies: 1,
+      amount: 5,
+      status: "Pending",
+      student: "Aarav",
+      sides: "single",
+      paper: "A4",
+    });
+
+    expect(order.id).toBe(order.pickupCode);
+    expect(order.id).toMatch(/^[1-9][0-9]{3}$/);
+  });
+});
+
+

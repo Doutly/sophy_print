@@ -6,8 +6,10 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { deleteObject, ref } from "firebase/storage";
 import { db, storage } from "./firebase";
@@ -186,9 +188,50 @@ export async function fetchFirestoreOrders(): Promise<PrintJob[]> {
   }
 }
 
+/**
+ * Generates a collision-free 4-digit pickup code & order ID (1000–9999).
+ * Checks active orders in Firestore and localStorage so no two active uncollected orders collide.
+ */
+export async function generateUniquePickupCode(): Promise<string> {
+  const activeStatuses = ["Pending", "Waiting", "Printing", "Ready"];
+  let candidate = Math.floor(1000 + Math.random() * 9000).toString();
+
+  try {
+    const ordersCol = collection(db, "orders");
+    const activeQuery = query(ordersCol, where("status", "in", activeStatuses));
+    const snap = await getDocs(activeQuery);
+    const occupiedCodes = new Set<string>();
+
+    snap.forEach((d) => {
+      const data = d.data() as PrintJob;
+      if (data.id) occupiedCodes.add(data.id.toString().toUpperCase());
+      if (data.pickupCode) occupiedCodes.add(data.pickupCode.toString().toUpperCase());
+    });
+
+    // Also check local cache
+    getStoredPrintJobs().forEach((j) => {
+      if (activeStatuses.includes(j.status)) {
+        if (j.id) occupiedCodes.add(j.id.toString().toUpperCase());
+        if (j.pickupCode) occupiedCodes.add(j.pickupCode.toString().toUpperCase());
+      }
+    });
+
+    let attempts = 0;
+    while (occupiedCodes.has(candidate) && attempts < 30) {
+      candidate = Math.floor(1000 + Math.random() * 9000).toString();
+      attempts++;
+    }
+  } catch (err) {
+    console.warn("Could not check active codes collision:", err);
+  }
+
+  return candidate;
+}
+
 export async function createPrintOrder(order: Omit<PrintJob, "id" | "placed"> & { id?: string }): Promise<PrintJob> {
-  // Use a timestamp-based ID that is unique across devices
-  const id = order.id || `P${Date.now().toString(36).toUpperCase()}`;
+  // Use the exact same 4-digit number for BOTH the Order ID and the Pickup Code
+  const code = order.id || order.pickupCode || (await generateUniquePickupCode());
+  const id = code;
   const now = new Date();
   const isoStr = now.toISOString();
   const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -198,7 +241,7 @@ export async function createPrintOrder(order: Omit<PrintJob, "id" | "placed"> & 
     id,
     placed: timeStr,
     createdAt: isoStr,
-    pickupCode: order.pickupCode || Math.floor(1000 + Math.random() * 9000).toString(),
+    pickupCode: id,
   };
 
   // Strip any undefined keys so Firestore setDoc never throws Unsupported field value: undefined
@@ -338,13 +381,37 @@ export async function deleteOrderCompletely(jobId: string, storagePath?: string)
 
 export async function fetchOrderById(id: string): Promise<PrintJob | undefined> {
   const cleanId = id.replace("#", "").trim().toUpperCase();
+  if (!cleanId) return undefined;
 
-  // Firestore is the source of truth — no localStorage fallback for cross-device correctness
-  const snap = await getDoc(doc(db, "orders", cleanId));
-  if (snap.exists()) {
-    return snap.data() as PrintJob;
+  // 1. Primary: Direct document lookup (instant for 4-digit ID or exact doc ID)
+  try {
+    const snap = await getDoc(doc(db, "orders", cleanId));
+    if (snap.exists()) {
+      return snap.data() as PrintJob;
+    }
+  } catch (err) {
+    console.warn("Direct doc fetch error:", err);
   }
-  return undefined;
+
+  // 2. Fallback: Query by pickupCode for legacy alphanumeric orders (e.g. PMV5AOSYN)
+  try {
+    const ordersCol = collection(db, "orders");
+    const q = query(ordersCol, where("pickupCode", "==", cleanId));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty) {
+      return querySnap.docs[0].data() as PrintJob;
+    }
+  } catch (err) {
+    console.warn("Pickup code query error:", err);
+  }
+
+  // 3. Fallback: Local stored jobs
+  const localMatch = getStoredPrintJobs().find(
+    (j) =>
+      j.id.toUpperCase() === cleanId ||
+      (j.pickupCode && j.pickupCode.toUpperCase() === cleanId)
+  );
+  return localMatch;
 }
 
 /**
@@ -359,22 +426,61 @@ export function subscribeToOrderById(
     callback(null);
     return () => {};
   }
+
   try {
-    const unsub = onSnapshot(
+    let queryUnsub: (() => void) | null = null;
+    let queryStarted = false;
+
+    const docUnsub = onSnapshot(
       doc(db, "orders", cleanId),
       (snap) => {
         if (snap.exists()) {
           callback(snap.data() as PrintJob);
         } else {
-          callback(null);
+          // If not found by document ID, try querying by pickupCode once for legacy orders
+          if (!queryStarted) {
+            queryStarted = true;
+            try {
+              const ordersCol = collection(db, "orders");
+              const q = query(ordersCol, where("pickupCode", "==", cleanId));
+              queryUnsub = onSnapshot(
+                q,
+                (qSnap) => {
+                  if (!qSnap.empty) {
+                    callback(qSnap.docs[0].data() as PrintJob);
+                  } else {
+                    // Check local cache as final fallback
+                    const local = getStoredPrintJobs().find(
+                      (j) =>
+                        j.id.toUpperCase() === cleanId ||
+                        (j.pickupCode && j.pickupCode.toUpperCase() === cleanId)
+                    );
+                    callback(local || null);
+                  }
+                },
+                () => callback(null)
+              );
+            } catch {
+              callback(null);
+            }
+          }
         }
       },
       (err) => {
-        console.warn("Could not subscribe to order:", err);
-        callback(null);
+        console.warn("Could not subscribe to order by ID:", err);
+        const local = getStoredPrintJobs().find(
+          (j) =>
+            j.id.toUpperCase() === cleanId ||
+            (j.pickupCode && j.pickupCode.toUpperCase() === cleanId)
+        );
+        callback(local || null);
       }
     );
-    return unsub;
+
+    return () => {
+      docUnsub();
+      if (queryUnsub) queryUnsub();
+    };
   } catch (err) {
     console.warn("Error setting up order subscription:", err);
     callback(null);

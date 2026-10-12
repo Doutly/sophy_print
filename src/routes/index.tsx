@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, FileText, Minus, Plus, Printer, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, FileCheck2, FileText, Minus, Plus, Printer, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -162,7 +163,6 @@ function StudentPrintFlow() {
         status: "Pending",
         student: studentName.trim() || "Anonymous",
         phone: studentPhone.trim() || undefined,
-        pickupCode: Math.floor(1000 + Math.random() * 9000).toString(),
         sides,
         paper,
         printer: mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III" : "Epson L5290",
@@ -687,29 +687,45 @@ function StudentPrintFlow() {
               You're in the queue.
             </h1>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              Order <strong className="text-foreground">#{createdOrder?.id || "P1029"}</strong> is now queued for printing on{" "}
+              Order <strong className="text-foreground font-mono">#{createdOrder?.id || "2762"}</strong> is now queued for printing on{" "}
               {mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}.
             </p>
 
-            <div className="mx-auto mt-8 max-w-sm rounded-xl border border-border bg-card p-6 text-left shadow-xs">
+            <div className="mx-auto mt-8 max-w-sm rounded-xl border border-primary/20 bg-card p-6 text-left shadow-xs">
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Estimated printing wait</span>
                 <span className="font-semibold text-foreground">5–8 min</span>
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-                <span className="text-xs text-muted-foreground">Your 4-Digit Pickup Code</span>
-                <span className="font-display text-2xl font-bold tracking-widest text-primary">
-                  {createdOrder?.pickupCode || "4821"}
+                <div>
+                  <span className="text-xs font-medium text-foreground">Pickup & Order Code</span>
+                  <p className="text-[11px] text-muted-foreground">Single 4-digit code for counter pickup & tracking</p>
+                </div>
+                <span className="font-display text-3xl font-bold tracking-widest text-primary font-mono">
+                  {createdOrder?.id || "2762"}
                 </span>
               </div>
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                Show this pickup code at the counter when collecting your printed sheets.
-              </p>
+              <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const code = createdOrder?.id || "2762";
+                    navigator.clipboard.writeText(code);
+                    toast.success(`Copied code #${code} to clipboard`);
+                  }}
+                  className="gap-1.5 text-xs h-8"
+                >
+                  <Copy className="size-3.5" /> Copy Code
+                </Button>
+                <span className="text-[11px] text-muted-foreground">Show at Xerox counter</span>
+              </div>
             </div>
 
             <div className="mt-8 flex justify-center gap-3">
-              <Button asChild size="lg" className="shadow-xs">
-                <Link to="/track" search={{ order: createdOrder?.id || "P1029" }}>
+              <Button asChild size="lg" className="shadow-xs gap-2">
+                <Link to="/track" search={{ order: createdOrder?.id || "2762" }}>
                   Track order live <ChevronRight className="size-4" />
                 </Link>
               </Button>

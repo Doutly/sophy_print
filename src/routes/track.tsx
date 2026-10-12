@@ -133,14 +133,14 @@ function TrackPage() {
           Know exactly when it's ready.
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Enter your order number or pickup code to see real-time queue progress.
+          Enter your 4-digit pickup code or order number (e.g. 2762 or #2762) to see real-time queue progress.
         </p>
 
         <form className="mt-8 flex gap-2" onSubmit={handleSearch}>
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="e.g. P1001"
+            placeholder="e.g. 2762 or #2762"
             className="h-11 bg-card text-sm shadow-xs font-mono"
           />
           <Button type="submit" size="lg" disabled={searching} className="gap-2 shadow-xs">
