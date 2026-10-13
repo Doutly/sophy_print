@@ -33,6 +33,7 @@ The shop operates **two identical Canon imageRUNNER ADVANCE 4545i III** multifun
 ```
 
 ### Windows Printer Name Verification:
+
 1. Open **Settings > Bluetooth & devices > Printers & scanners** in Windows.
 2. Verify both Canon LAN network printers are installed (e.g. using the Canon Generic Plus UFR II or PCL6 driver).
 3. If they are named differently (e.g. `Canon iR-ADV 4545i III`), ensure the names in `config.json` match exactly.
@@ -43,6 +44,7 @@ The shop operates **two identical Canon imageRUNNER ADVANCE 4545i III** multifun
 ## 🔄 Automatic Windows Boot Startup (Optional)
 
 To ensure the agent starts silently every time Windows turns on:
+
 1. Right-click `install-service.ps1`.
 2. Select **Run with PowerShell** (or run as Administrator in PowerShell).
 3. The gateway is now registered as an auto-recovering Windows service!

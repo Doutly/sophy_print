@@ -1,5 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, DollarSign, HelpCircle, Layers, Printer, RefreshCw, RotateCcw, Save, Sparkles } from "lucide-react";
+import {
+  Check,
+  DollarSign,
+  HelpCircle,
+  Layers,
+  Printer,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Sparkles,
+} from "lucide-react";
 import { useState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { Button } from "@/components/ui/button";
@@ -17,9 +27,15 @@ export const Route = createFileRoute("/admin/pricing")({
   head: () => ({
     meta: [
       { title: "Pricing Management — Sophy Print" },
-      { name: "description", content: "Configure print rates and pricing rules for campus printing." },
+      {
+        name: "description",
+        content: "Configure print rates and pricing rules for campus printing.",
+      },
       { property: "og:title", content: "Pricing Management — Sophy Print" },
-      { property: "og:description", content: "Campus print rates, sheet pricing, and machine fees." },
+      {
+        property: "og:description",
+        content: "Campus print rates, sheet pricing, and machine fees.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -82,9 +98,12 @@ function PricingPage() {
         {/* Intro Banner */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="font-display text-lg font-semibold text-foreground">Campus Rate Schedule</h2>
+            <h2 className="font-display text-lg font-semibold text-foreground">
+              Campus Rate Schedule
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Rates apply automatically to all upcoming student submissions. Existing paid orders retain their locked order rate.
+              Rates apply automatically to all upcoming student submissions. Existing paid orders
+              retain their locked order rate.
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-1 text-xs font-medium text-primary">
@@ -103,8 +122,12 @@ function PricingPage() {
                   <Printer className="size-4" />
                 </span>
                 <div>
-                  <h3 className="font-display font-semibold text-foreground">Black & White (Dual Canon imageRUNNER ADVANCE 4545i III)</h3>
-                  <p className="text-xs text-muted-foreground">High-speed 45 PPM monochrome xerox copiers (LAN Connected)</p>
+                  <h3 className="font-display font-semibold text-foreground">
+                    Black & White (Dual Canon imageRUNNER ADVANCE 4545i III)
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    High-speed 45 PPM monochrome xerox copiers (LAN Connected)
+                  </p>
                 </div>
               </div>
 
@@ -114,7 +137,9 @@ function PricingPage() {
                     Single-sided (₹ / page)
                   </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">₹</span>
+                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">
+                      ₹
+                    </span>
                     <Input
                       id="bwSingle"
                       type="number"
@@ -132,7 +157,9 @@ function PricingPage() {
                     Double-sided duplex (₹ / sheet)
                   </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">₹</span>
+                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">
+                      ₹
+                    </span>
                     <Input
                       id="bwDouble"
                       type="number"
@@ -154,18 +181,27 @@ function PricingPage() {
                   <Printer className="size-4" />
                 </span>
                 <div>
-                  <h3 className="font-display font-semibold text-foreground">Colour (Epson L5290 Series)</h3>
-                  <p className="text-xs text-muted-foreground">High-precision colour ink jet printing</p>
+                  <h3 className="font-display font-semibold text-foreground">
+                    Colour (Epson L5290 Series)
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    High-precision colour ink jet printing
+                  </p>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="colourSingle" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="colourSingle"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     Single-sided (₹ / page)
                   </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">₹</span>
+                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">
+                      ₹
+                    </span>
                     <Input
                       id="colourSingle"
                       type="number"
@@ -179,11 +215,16 @@ function PricingPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="colourDouble" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="colourDouble"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     Double-sided (₹ / sheet)
                   </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">₹</span>
+                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">
+                      ₹
+                    </span>
                     <Input
                       id="colourDouble"
                       type="number"
@@ -205,14 +246,21 @@ function PricingPage() {
                   <Layers className="size-4" />
                 </span>
                 <div>
-                  <h3 className="font-display font-semibold text-foreground">Format Multipliers & Platform Fee</h3>
-                  <p className="text-xs text-muted-foreground">Rules for special formats and service handling</p>
+                  <h3 className="font-display font-semibold text-foreground">
+                    Format Multipliers & Platform Fee
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Rules for special formats and service handling
+                  </p>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="a3Multiplier" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="a3Multiplier"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     A3 Paper Size Multiplier (e.g. 2.0x)
                   </Label>
                   <Input
@@ -227,11 +275,16 @@ function PricingPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="platformFee" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="platformFee"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     Convenience / Platform Fee (₹)
                   </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">₹</span>
+                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">
+                      ₹
+                    </span>
                     <Input
                       id="platformFee"
                       type="number"
@@ -252,8 +305,12 @@ function PricingPage() {
             <div className="sticky top-24 rounded-xl border border-border bg-card p-6 shadow-xs">
               <div className="flex items-center justify-between pb-4 border-b border-border">
                 <div>
-                  <h3 className="font-display font-semibold text-foreground">Live Rate Simulator</h3>
-                  <p className="text-xs text-muted-foreground">Preview student checkout calculations</p>
+                  <h3 className="font-display font-semibold text-foreground">
+                    Live Rate Simulator
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Preview student checkout calculations
+                  </p>
                 </div>
                 <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                   Interactive
@@ -367,7 +424,9 @@ function PricingPage() {
 
               {/* Price Calculation Output Box */}
               <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">Estimated Student Price</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                  Estimated Student Price
+                </p>
                 <div className="mt-2 flex items-baseline justify-between">
                   <span className="font-display text-3xl font-bold tracking-tight text-foreground">
                     ₹{simulated.total.toFixed(2)}
@@ -380,7 +439,9 @@ function PricingPage() {
                 <div className="mt-4 space-y-1.5 border-t border-primary/15 pt-3 text-xs text-muted-foreground">
                   <div className="flex justify-between">
                     <span>Base rate per unit</span>
-                    <span className="font-medium text-foreground">₹{simulated.unitRate.toFixed(2)}</span>
+                    <span className="font-medium text-foreground">
+                      ₹{simulated.unitRate.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Physical paper sheets</span>
@@ -388,7 +449,9 @@ function PricingPage() {
                   </div>
                   <div className="flex justify-between">
                     <span>Convenience fee</span>
-                    <span className="font-medium text-foreground">₹{simulated.platformFee.toFixed(2)}</span>
+                    <span className="font-medium text-foreground">
+                      ₹{simulated.platformFee.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>

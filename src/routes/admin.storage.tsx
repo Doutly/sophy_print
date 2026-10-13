@@ -7,18 +7,21 @@ import {
   Clock,
   Download,
   ExternalLink,
+  Eye,
   FileText,
   Filter,
   HardDrive,
   RefreshCw,
   Search,
   ShieldAlert,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DocumentPreviewModal } from "@/components/document-preview-modal";
 import {
   deleteOrderCompletely,
   fetchFirestoreOrders,
@@ -32,9 +35,16 @@ export const Route = createFileRoute("/admin/storage")({
   head: () => ({
     meta: [
       { title: "Storage Manager — Sophy Print" },
-      { name: "description", content: "Manage uploaded student print files and bulk-purge old files to reduce Firebase Storage costs." },
+      {
+        name: "description",
+        content:
+          "Manage uploaded student print files and bulk-purge old files to reduce Firebase Storage costs.",
+      },
       { property: "og:title", content: "Storage Manager — Sophy Print" },
-      { property: "og:description", content: "Student uploaded files and Firebase Storage cost optimization." },
+      {
+        property: "og:description",
+        content: "Student uploaded files and Firebase Storage cost optimization.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -62,7 +72,12 @@ function StorageManagerPage() {
   const [startDate, setStartDate] = useState(defaultFrom);
   const [endDate, setEndDate] = useState(defaultTo);
   const [purging, setPurging] = useState(false);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [previewJob, setPreviewJob] = useState<PrintJob | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Subscribe to live Firestore orders
   useEffect(() => {
@@ -77,10 +92,9 @@ function StorageManagerPage() {
   // Filter jobs based on search query, status filter, and optional date range
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
-      const matchesQuery =
-        `${job.id} ${job.file} ${job.student} ${job.pickupCode || ""}`
-          .toLowerCase()
-          .includes(query.toLowerCase());
+      const matchesQuery = `${job.id} ${job.file} ${job.student} ${job.pickupCode || ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase());
 
       const isActive = Boolean(job.storagePath || job.downloadUrl) && !job.isPurged;
       const isPurged = Boolean(job.isPurged) || (!job.storagePath && !job.downloadUrl);
@@ -99,7 +113,8 @@ function StorageManagerPage() {
     const end = new Date(endDate).setHours(23, 59, 59, 999);
 
     return jobs.filter((job) => {
-      const hasPhysicalFile = (Boolean(job.storagePath) || Boolean(job.downloadUrl)) && !job.isPurged;
+      const hasPhysicalFile =
+        (Boolean(job.storagePath) || Boolean(job.downloadUrl)) && !job.isPurged;
       if (!hasPhysicalFile) return false;
       const jobTime = job.createdAt ? new Date(job.createdAt).getTime() : 0;
       return jobTime >= start && jobTime <= end;
@@ -109,7 +124,9 @@ function StorageManagerPage() {
   // Overall Storage Statistics
   const stats = useMemo(() => {
     const totalOrders = jobs.length;
-    const activeStoredFiles = jobs.filter((j) => (j.storagePath || j.downloadUrl) && !j.isPurged).length;
+    const activeStoredFiles = jobs.filter(
+      (j) => (j.storagePath || j.downloadUrl) && !j.isPurged,
+    ).length;
     const purgedFiles = jobs.filter((j) => j.isPurged).length;
     // Estimated average 1.8 MB per uploaded multi-page document
     const estimatedSavedMB = (purgedFiles * 1.8).toFixed(1);
@@ -119,7 +136,11 @@ function StorageManagerPage() {
 
   // Handle single file purge
   const handleSinglePurge = async (job: PrintJob) => {
-    if (!window.confirm(`Purge physical file for order #${job.id} ("${job.file}") from Firebase Storage? This will reduce cloud storage costs while preserving revenue accounting.`)) {
+    if (
+      !window.confirm(
+        `Purge physical file for order #${job.id} ("${job.file}") from Firebase Storage? This will reduce cloud storage costs while preserving revenue accounting.`,
+      )
+    ) {
       return;
     }
 
@@ -173,7 +194,11 @@ function StorageManagerPage() {
 
   // Handle hard delete of entire record
   const handleHardDelete = async (job: PrintJob) => {
-    if (!window.confirm(`Permanently delete order #${job.id} and its file completely from Firestore and Storage? This cannot be undone.`)) {
+    if (
+      !window.confirm(
+        `Permanently delete order #${job.id} and its file completely from Firestore and Storage? This cannot be undone.`,
+      )
+    ) {
       return;
     }
 
@@ -252,8 +277,12 @@ function StorageManagerPage() {
               </span>
               <span className="text-xs font-semibold text-primary">Real-time</span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Uploads</p>
-            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">{stats.totalOrders}</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Total Uploads
+            </p>
+            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
+              {stats.totalOrders}
+            </p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
@@ -263,8 +292,12 @@ function StorageManagerPage() {
               </span>
               <span className="text-xs font-semibold text-emerald-600">In Cloud</span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Stored Files</p>
-            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">{stats.activeStoredFiles}</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Active Stored Files
+            </p>
+            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
+              {stats.activeStoredFiles}
+            </p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
@@ -274,8 +307,12 @@ function StorageManagerPage() {
               </span>
               <span className="text-xs font-semibold text-blue-600">Zero Cost</span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Purged Files</p>
-            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">{stats.purgedFiles}</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Purged Files
+            </p>
+            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
+              {stats.purgedFiles}
+            </p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
@@ -285,8 +322,12 @@ function StorageManagerPage() {
               </span>
               <span className="text-xs font-semibold text-amber-600">Saved</span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Storage Capacity Saved</p>
-            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">~{stats.estimatedSavedMB} MB</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Storage Capacity Saved
+            </p>
+            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
+              ~{stats.estimatedSavedMB} MB
+            </p>
           </div>
         </div>
 
@@ -299,7 +340,8 @@ function StorageManagerPage() {
                 Date Range Storage Purge
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Delete physical storage files in bulk for a date range to stay inside Firebase's free tier and eliminate storage fees.
+                Delete physical storage files in bulk for a date range to stay inside Firebase's
+                free tier and eliminate storage fees.
               </p>
             </div>
             <span className="rounded-full bg-secondary/80 px-2.5 py-1 text-xs font-medium text-muted-foreground w-fit">
@@ -412,7 +454,8 @@ function StorageManagerPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredJobs.map((job) => {
-                    const isCloudStored = Boolean(job.storagePath || job.downloadUrl) && !job.isPurged;
+                    const isCloudStored =
+                      Boolean(job.storagePath || job.downloadUrl) && !job.isPurged;
 
                     return (
                       <tr key={job.id} className="hover:bg-secondary/20 transition-colors">
@@ -430,14 +473,21 @@ function StorageManagerPage() {
 
                         <td className="px-5 py-3.5 text-muted-foreground">
                           <p className="font-medium text-foreground">{job.student}</p>
-                          <p className="text-[11px]">{job.placed} · {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recent"}</p>
+                          <p className="text-[11px]">
+                            {job.placed} ·{" "}
+                            {job.createdAt
+                              ? new Date(job.createdAt).toLocaleDateString()
+                              : "Recent"}
+                          </p>
                         </td>
 
                         <td className="px-5 py-3.5 text-muted-foreground">
                           <p className="font-semibold text-foreground">
                             {job.pages} p · {job.copies} {job.copies === 1 ? "copy" : "copies"}
                           </p>
-                          <p className="text-[11px]">{job.type} ({job.printer || "Standard"})</p>
+                          <p className="text-[11px]">
+                            {job.type} ({job.printer || "Standard"})
+                          </p>
                         </td>
 
                         <td className="px-5 py-3.5">
@@ -456,16 +506,31 @@ function StorageManagerPage() {
 
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPreviewJob(job);
+                                setPreviewOpen(true);
+                              }}
+                              className="h-8 gap-1 text-[11px] shadow-xs"
+                              title="Preview document in-browser without downloading"
+                            >
+                              <Eye className="size-3" /> Preview
+                            </Button>
+
                             {job.downloadUrl && !job.isPurged ? (
                               <Button
-                                asChild
                                 variant="outline"
                                 size="sm"
-                                className="h-8 gap-1 text-[11px] shadow-xs"
+                                onClick={() => {
+                                  setPreviewJob(job);
+                                  setPreviewOpen(true);
+                                }}
+                                className="h-8 gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 shadow-xs"
+                                title="Push document to Student Template Gallery"
                               >
-                                <a href={job.downloadUrl} target="_blank" rel="noreferrer">
-                                  <Download className="size-3" /> View
-                                </a>
+                                <Sparkles className="size-3" /> Push to Gallery
                               </Button>
                             ) : null}
 
@@ -501,6 +566,21 @@ function StorageManagerPage() {
           )}
         </section>
       </div>
+
+      <DocumentPreviewModal
+        job={previewJob}
+        isOpen={previewOpen}
+        onClose={() => {
+          setPreviewOpen(false);
+          setPreviewJob(null);
+        }}
+        onPushedToGallery={(tpl) => {
+          setActionMessage({
+            type: "success",
+            text: `Document pushed to Student Template Gallery: "${tpl.title}"!`,
+          });
+        }}
+      />
     </AdminShell>
   );
 }

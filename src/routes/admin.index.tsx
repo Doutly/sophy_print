@@ -1,5 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Banknote, FileText, Layers3, Printer, TrendingUp, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  Banknote,
+  FileText,
+  Layers3,
+  Printer,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { getStoredPrintJobs, subscribeToOrders, type PrintJob } from "@/lib/print-data";
@@ -32,7 +40,9 @@ function OverviewPage() {
   const liveStats = useMemo(() => {
     const revenue = jobs.reduce((acc, j) => acc + (j.amount || 0), 0);
     const pages = jobs.reduce((acc, j) => acc + (j.pages || 0) * (j.copies || 1), 0);
-    const active = jobs.filter((j) => j.status === "Printing" || j.status === "Waiting" || j.status === "Pending").length;
+    const active = jobs.filter(
+      (j) => j.status === "Printing" || j.status === "Waiting" || j.status === "Pending",
+    ).length;
 
     return [
       {
@@ -64,7 +74,18 @@ function OverviewPage() {
 
   // Dynamic hourly breakdown from real orders
   const hourlyData = useMemo(() => {
-    const hours = ["8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM"];
+    const hours = [
+      "8 AM",
+      "9 AM",
+      "10 AM",
+      "11 AM",
+      "12 PM",
+      "1 PM",
+      "2 PM",
+      "3 PM",
+      "4 PM",
+      "5 PM",
+    ];
     const counts = new Array(hours.length).fill(0);
 
     for (const job of jobs) {
@@ -97,8 +118,12 @@ function OverviewPage() {
               </span>
               <span className="text-xs font-semibold text-primary">{note}</span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">{value}</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {label}
+            </p>
+            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
+              {value}
+            </p>
           </div>
         ))}
       </div>
@@ -108,7 +133,9 @@ function OverviewPage() {
         <section className="rounded-xl border border-border bg-card shadow-xs">
           <div className="flex items-center justify-between border-b border-border p-5">
             <div>
-              <h2 className="font-display text-lg font-semibold text-foreground">Live print queue</h2>
+              <h2 className="font-display text-lg font-semibold text-foreground">
+                Live print queue
+              </h2>
               <p className="text-xs text-muted-foreground">Real-time incoming student documents</p>
             </div>
             <Link
@@ -123,7 +150,9 @@ function OverviewPage() {
             <div className="p-10 text-center text-xs text-muted-foreground">
               <Printer className="mx-auto size-8 text-muted-foreground/40 mb-2" />
               <p className="font-semibold text-foreground">Queue is currently clear</p>
-              <p className="mt-1">When students place print orders on the campus portal, they will appear here live.</p>
+              <p className="mt-1">
+                When students place print orders on the campus portal, they will appear here live.
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -135,9 +164,13 @@ function OverviewPage() {
                   <span className="font-mono text-xs font-semibold text-foreground">#{job.id}</span>
                   <div className="hidden min-w-0 sm:block">
                     <p className="truncate text-xs font-medium text-foreground">{job.file}</p>
-                    <p className="text-[11px] text-muted-foreground">{job.placed} · {job.type}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {job.placed} · {job.type}
+                    </p>
                   </div>
-                  <span className="hidden text-xs text-muted-foreground sm:block">{job.pages} pages</span>
+                  <span className="hidden text-xs text-muted-foreground sm:block">
+                    {job.pages} pages
+                  </span>
                   <Status status={job.status} />
                 </div>
               ))}
@@ -148,7 +181,9 @@ function OverviewPage() {
         <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-display text-lg font-semibold text-foreground">Hourly Throughput</h2>
+              <h2 className="font-display text-lg font-semibold text-foreground">
+                Hourly Throughput
+              </h2>
               <p className="text-xs text-muted-foreground">Real orders finished by hour</p>
             </div>
             <TrendingUp className="size-4.5 text-primary" />
@@ -160,7 +195,9 @@ function OverviewPage() {
                 key={hour}
                 title={`${hour}: ${count} jobs`}
                 className={`flex-1 rounded-t-sm transition-all ${
-                  count > 0 ? "bg-primary hover:bg-primary/80" : "bg-secondary hover:bg-secondary/80"
+                  count > 0
+                    ? "bg-primary hover:bg-primary/80"
+                    : "bg-secondary hover:bg-secondary/80"
                 }`}
                 style={{ height: `${percentage}%` }}
               />
@@ -183,10 +220,12 @@ function Status({ status }: { status: string }) {
     status === "Printing"
       ? "bg-info/10 text-info border border-info/20"
       : status === "Ready" || status === "Completed"
-      ? "bg-primary/10 text-primary border border-primary/20"
-      : status === "Failed"
-      ? "bg-destructive/10 text-destructive border border-destructive/20"
-      : "bg-warning/10 text-warning border border-warning/20";
+        ? "bg-primary/10 text-primary border border-primary/20"
+        : status === "Failed"
+          ? "bg-destructive/10 text-destructive border border-destructive/20"
+          : "bg-warning/10 text-warning border border-warning/20";
 
-  return <span className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${style}`}>{status}</span>;
+  return (
+    <span className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${style}`}>{status}</span>
+  );
 }

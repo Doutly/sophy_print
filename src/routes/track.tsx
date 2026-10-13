@@ -1,9 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Check, CheckCircle2, ChevronLeft, CircleDot, Clock3, PackageCheck, Printer, Search, type LucideIcon } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  CircleDot,
+  Clock3,
+  PackageCheck,
+  Printer,
+  Search,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetchOrderById, getStoredPrintJobs, subscribeToOrderById, type PrintJob } from "@/lib/print-data";
+import {
+  fetchOrderById,
+  getStoredPrintJobs,
+  subscribeToOrderById,
+  type PrintJob,
+} from "@/lib/print-data";
 
 export const Route = createFileRoute("/track")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -93,8 +108,8 @@ function TrackPage() {
           detail: isReady
             ? "Finished printing"
             : matchedJob.status === "Printing"
-            ? "Document printing on machine tray"
-            : "In print queue",
+              ? "Document printing on machine tray"
+              : "In print queue",
           active: isPrinting,
         },
         {
@@ -110,7 +125,10 @@ function TrackPage() {
     <main className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20">
       <header className="border-b border-border bg-card/80 backdrop-blur-md">
         <div className="mx-auto flex h-18 max-w-5xl items-center justify-between px-5">
-          <Link to="/" className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight">
+          <Link
+            to="/"
+            className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight"
+          >
             <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground shadow-xs">
               <Printer className="size-4" />
             </span>
@@ -128,12 +146,15 @@ function TrackPage() {
       </header>
 
       <div className="mx-auto max-w-xl px-5 py-14 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-wider text-primary">Live Order Tracker</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+          Live Order Tracker
+        </p>
         <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           Know exactly when it's ready.
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Enter your 4-digit pickup code or order number (e.g. 2762 or #2762) to see real-time queue progress.
+          Enter your 4-digit pickup code or order number (e.g. 2762 or #2762) to see real-time queue
+          progress.
         </p>
 
         <form className="mt-8 flex gap-2" onSubmit={handleSearch}>
@@ -187,11 +208,15 @@ function TrackPage() {
                             <Icon className="size-4" />
                           </span>
                           {index < timelineSteps.length - 1 && (
-                            <span className={`h-9 w-px ${active ? "bg-primary/40" : "bg-border"}`} />
+                            <span
+                              className={`h-9 w-px ${active ? "bg-primary/40" : "bg-border"}`}
+                            />
                           )}
                         </div>
                         <div className="pt-1">
-                          <p className={`text-sm font-semibold ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                          <p
+                            className={`text-sm font-semibold ${active ? "text-foreground" : "text-muted-foreground"}`}
+                          >
                             {label}
                           </p>
                           <p className="text-xs text-muted-foreground">{detail}</p>
@@ -205,14 +230,20 @@ function TrackPage() {
                     <div className="flex items-center gap-3">
                       <Clock3 className="size-5 text-primary" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Show code at the Xerox counter</p>
+                        <p className="text-xs text-muted-foreground">
+                          Show code at the Xerox counter
+                        </p>
                         <p className="text-sm font-semibold text-foreground">
-                          {isReady ? "Ready for immediate collection" : "Printing in progress on shop printer"}
+                          {isReady
+                            ? "Ready for immediate collection"
+                            : "Printing in progress on shop printer"}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Pickup Code</p>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Pickup Code
+                      </p>
                       <p className="font-display text-2xl font-bold tracking-widest text-primary">
                         {matchedJob.pickupCode}
                       </p>
@@ -223,9 +254,12 @@ function TrackPage() {
             ) : (
               <section className="mt-8 animate-rise rounded-xl border border-border bg-card p-8 text-center shadow-xs">
                 <Printer className="mx-auto size-10 text-muted-foreground/40 mb-3" />
-                <h2 className="font-display font-bold text-foreground text-base">Order Not Found</h2>
+                <h2 className="font-display font-bold text-foreground text-base">
+                  Order Not Found
+                </h2>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                  No active print order matches "{query}". Please check your order ID or place a new print job.
+                  No active print order matches "{query}". Please check your order ID or place a new
+                  print job.
                 </p>
               </section>
             )}

@@ -1,5 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, FileCheck2, FileText, Minus, Plus, Printer, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Edit3,
+  FileCheck2,
+  FileText,
+  Minus,
+  Plus,
+  Printer,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,12 +35,18 @@ import {
   type PrintJob,
   type PricingConfig,
 } from "@/lib/print-data";
+import { TemplateGallery } from "@/components/template-gallery";
+import { DocumentEditorCanvas } from "@/components/document-editor-canvas";
+import type { CampusTemplate } from "@/lib/templates-data";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Sophy Print — Print without the queue" },
-      { name: "description", content: "Upload a PDF, choose your print settings, and collect it when ready." },
+      {
+        name: "description",
+        content: "Upload a PDF, choose your print settings, and collect it when ready.",
+      },
       { property: "og:title", content: "Sophy Print — Print without the queue" },
       { property: "og:description", content: "A fast, simple way to print on campus." },
       { property: "og:type", content: "website" },
@@ -47,6 +70,7 @@ function StudentPrintFlow() {
   const [detectedTotalPages, setDetectedTotalPages] = useState(1);
   const [fileError, setFileError] = useState<string | null>(null);
   const [formatNotice, setFormatNotice] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   // Print configuration
   const [copies, setCopies] = useState(1);
@@ -65,6 +89,46 @@ function StudentPrintFlow() {
   // Student identity (optional, for pickup contact)
   const [studentName, setStudentName] = useState("");
   const [studentPhone, setStudentPhone] = useState("");
+  const [uploadMode, setUploadMode] = useState<"upload" | "gallery">("upload");
+
+  // Check if a template was picked from the /templates route
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("sophy_selected_template_v1");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed?.generatedFileName) {
+            setFileName(parsed.generatedFileName);
+            if (parsed.values?.studentName) {
+              setStudentName(parsed.values.studentName);
+            }
+            setDetectedTotalPages(1);
+            setStep(2);
+            sessionStorage.removeItem("sophy_selected_template_v1");
+            toast.success(`Loaded template: ${parsed.template?.title || "Custom Document"}`);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, []);
+
+  const handleTemplateSelected = (data: {
+    template: CampusTemplate;
+    file?: File;
+    generatedFileName: string;
+    pageCount?: number;
+  }) => {
+    setFileName(data.generatedFileName);
+    if (data.file) {
+      setUploadedFile(data.file);
+    }
+    setDetectedTotalPages(data.pageCount || 1);
+    setStep(2);
+    toast.success(`Template loaded: ${data.template.title}`);
+  };
 
   // Pricing — load from Firestore on mount, fall back to cached/default
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(defaultPricingConfig);
@@ -186,7 +250,10 @@ function StudentPrintFlow() {
       {/* Top Navbar */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-20">
         <div className="mx-auto flex h-18 max-w-6xl items-center justify-between px-5 sm:px-8">
-          <Link to="/" className="flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight text-foreground">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight text-foreground"
+          >
             <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground shadow-xs">
               <Printer className="size-4.5" />
             </span>
@@ -195,6 +262,13 @@ function StudentPrintFlow() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            <Link
+              to="/templates"
+              className="text-xs font-semibold text-primary transition-colors hover:opacity-80 flex items-center gap-1"
+            >
+              <Sparkles className="size-3.5" />
+              Template Gallery
+            </Link>
             <Link
               to="/track"
               search={{ order: undefined }}
@@ -241,15 +315,15 @@ function StudentPrintFlow() {
                 {step === 1
                   ? "Print without the queue."
                   : step === 2
-                  ? "Choose print options & pages."
-                  : "Review & confirm your order."}
+                    ? "Choose print options & pages."
+                    : "Review & confirm your order."}
               </h1>
               <p className="mt-2 max-w-xl text-sm text-muted-foreground leading-relaxed">
                 {step === 1
                   ? "Upload your document. We'll automatically verify pages and print compatibility."
                   : step === 2
-                  ? "Select which pages to print, color mode, sides, paper size, and number of copies."
-                  : "Review details, pay digitally via UPI/Card, and walk up with your pickup code."}
+                    ? "Select which pages to print, color mode, sides, paper size, and number of copies."
+                    : "Review details, pay digitally via UPI/Card, and walk up with your pickup code."}
               </p>
             </div>
           </>
@@ -274,37 +348,112 @@ function StudentPrintFlow() {
               </div>
             )}
 
-            {!fileName ? (
-              <div
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  acceptFile(event.dataTransfer.files[0]);
-                }}
-                className="group relative grid min-h-80 place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-all hover:border-primary/60 hover:bg-primary/[0.01] shadow-xs"
-              >
-                <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/40 opacity-0 group-hover:animate-scan group-hover:opacity-100" />
-                <div>
-                  <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary shadow-xs">
-                    <Upload className="size-7" />
+            {!fileName && (
+              <div className="mb-6 flex rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setUploadMode("upload")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    uploadMode === "upload"
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  📁 Upload Document
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUploadMode("gallery")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    uploadMode === "gallery"
+                      ? "bg-background text-primary shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Sparkles className="size-3.5" />
+                  Campus Template Gallery
+                  <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-600 font-extrabold uppercase">
+                    Editable
                   </span>
-                  <h2 className="mt-6 font-display text-xl font-bold text-foreground">Drop your document here</h2>
-                  <p className="mt-1.5 text-xs text-muted-foreground">PDF, Word (DOCX), or PowerPoint (PPTX)</p>
-                  <Button size="lg" className="mt-6 min-w-44 shadow-xs" onClick={() => inputRef.current?.click()}>
-                    Choose Document
-                  </Button>
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    accept=".pdf,.docx,.doc,.pptx,.ppt,application/pdf"
-                    className="hidden"
-                    onChange={(event) => acceptFile(event.target.files?.[0])}
-                  />
-                  <p className="mt-4 text-xs text-muted-foreground">
-                    Printable documents only · Up to 50 MB · Private & secure on campus
-                  </p>
-                </div>
+                </button>
               </div>
+            )}
+
+            {!fileName ? (
+              uploadMode === "gallery" ? (
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
+                  <TemplateGallery
+                    onSelectTemplateForPrint={handleTemplateSelected}
+                    onSwitchToUpload={() => setUploadMode("upload")}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      acceptFile(event.dataTransfer.files[0]);
+                    }}
+                    className="group relative grid min-h-80 place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-all hover:border-primary/60 hover:bg-primary/[0.01] shadow-xs"
+                  >
+                    <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/40 opacity-0 group-hover:animate-scan group-hover:opacity-100" />
+                    <div>
+                      <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary shadow-xs">
+                        <Upload className="size-7" />
+                      </span>
+                      <h2 className="mt-6 font-display text-xl font-bold text-foreground">
+                        Drop your document here
+                      </h2>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        PDF, Word (DOCX), or PowerPoint (PPTX)
+                      </p>
+                      <Button
+                        size="lg"
+                        className="mt-6 min-w-44 shadow-xs"
+                        onClick={() => inputRef.current?.click()}
+                      >
+                        Choose Document
+                      </Button>
+                      <input
+                        ref={inputRef}
+                        type="file"
+                        accept=".pdf,.docx,.doc,.pptx,.ppt,application/pdf"
+                        className="hidden"
+                        onChange={(event) => acceptFile(event.target.files?.[0])}
+                      />
+                      <p className="mt-4 text-xs text-muted-foreground">
+                        Printable documents only · Up to 50 MB · Private & secure on campus
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary shrink-0">
+                        <Sparkles className="size-4" />
+                      </span>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">
+                          Need a Project Front Page or Lab Record Cover?
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Pick standard campus formats, customize with your credentials, and print
+                          in seconds.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setUploadMode("gallery")}
+                      className="gap-1.5 text-xs font-semibold shrink-0"
+                    >
+                      Browse Templates
+                    </Button>
+                  </div>
+                </>
+              )
             ) : (
               <div className="rounded-xl border border-border bg-card p-6 shadow-xs">
                 <div className="flex items-start gap-4">
@@ -353,10 +502,40 @@ function StudentPrintFlow() {
                     </div>
                   )}
                 </div>
+
+                {/* Edit document on canvas button */}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditorOpen(true)}
+                    className="gap-2 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/5"
+                  >
+                    <Edit3 className="size-3.5" />
+                    Edit Document (Whiteout & Add Text)
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Erase old text or type custom details directly on the page
+                  </span>
+                </div>
               </div>
             )}
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+              {fileName ? (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  disabled={analyzing}
+                  onClick={() => setEditorOpen(true)}
+                  className="gap-2 text-xs font-semibold"
+                >
+                  <Edit3 className="size-4 text-primary" />
+                  Edit / Whiteout Document
+                </Button>
+              ) : <div />}
+
               <Button
                 size="lg"
                 disabled={!fileName || analyzing}
@@ -366,6 +545,20 @@ function StudentPrintFlow() {
                 Choose settings <ChevronRight className="size-4" />
               </Button>
             </div>
+
+            {/* Document Editor Modal */}
+            <DocumentEditorCanvas
+              fileSource={uploadedFile}
+              initialFileName={fileName}
+              isOpen={editorOpen}
+              onClose={() => setEditorOpen(false)}
+              onApply={(result) => {
+                setUploadedFile(result.file);
+                setFileName(result.fileName);
+                setDetectedTotalPages(result.pageCount);
+                toast.success("Document updated with your edits!");
+              }}
+            />
 
             <div className="mt-10 grid grid-cols-3 gap-3 border-t border-border pt-6 text-xs text-muted-foreground">
               <span className="flex items-center gap-2">
@@ -466,7 +659,9 @@ function StudentPrintFlow() {
                       </p>
                     ) : (
                       <p className="text-[11px] text-destructive font-medium">
-                        ⚠ {parsedRange.error || "Please enter valid page numbers within document range"}
+                        ⚠{" "}
+                        {parsedRange.error ||
+                          "Please enter valid page numbers within document range"}
                       </p>
                     )}
                   </div>
@@ -524,7 +719,9 @@ function StudentPrintFlow() {
               {/* COPIES */}
               <div className="flex items-center justify-between rounded-xl border border-border bg-card p-5 shadow-xs">
                 <div>
-                  <p className="font-display font-semibold text-sm text-foreground">Number of copies</p>
+                  <p className="font-display font-semibold text-sm text-foreground">
+                    Number of copies
+                  </p>
                   <p className="text-xs text-muted-foreground">Sets of your document to print</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -553,14 +750,20 @@ function StudentPrintFlow() {
 
             {/* LIVE STICKY PRICE SUMMARY */}
             <aside className="h-fit rounded-xl border border-primary/20 bg-primary/5 p-5 shadow-xs lg:sticky lg:top-24">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">Live price estimate</p>
-              <p className="mt-2 font-display text-3xl font-bold tracking-tight text-foreground">₹{total}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                Live price estimate
+              </p>
+              <p className="mt-2 font-display text-3xl font-bold tracking-tight text-foreground">
+                ₹{total}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">Zero hidden charges</p>
 
               <div className="mt-4 space-y-2 border-t border-primary/20 pt-3 text-xs">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Routing machine</span>
-                  <span className="font-medium text-foreground">{mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}</span>
+                  <span className="font-medium text-foreground">
+                    {mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}
+                  </span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Selected pages</span>
@@ -584,7 +787,12 @@ function StudentPrintFlow() {
               <Button variant="ghost" onClick={() => setStep(1)} className="gap-1.5">
                 <ChevronLeft className="size-4" /> Back
               </Button>
-              <Button size="lg" disabled={!parsedRange.isValid} onClick={() => setStep(3)} className="gap-1.5 shadow-xs">
+              <Button
+                size="lg"
+                disabled={!parsedRange.isValid}
+                onClick={() => setStep(3)}
+                className="gap-1.5 shadow-xs"
+              >
                 Review order <ChevronRight className="size-4" />
               </Button>
             </div>
@@ -600,9 +808,12 @@ function StudentPrintFlow() {
                   <FileText className="size-6" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-foreground text-sm">{fileName || "Document.pdf"}</p>
+                  <p className="truncate font-semibold text-foreground text-sm">
+                    {fileName || "Document.pdf"}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    {activePages} pages to print · {paper} · {sides === "single" ? "Single-sided" : "Double-sided"}
+                    {activePages} pages to print · {paper} ·{" "}
+                    {sides === "single" ? "Single-sided" : "Double-sided"}
                   </p>
                 </div>
               </div>
@@ -612,7 +823,10 @@ function StudentPrintFlow() {
                   ["Copies", `${copies} copy`],
                   ["Mode", mode === "bw" ? "Black & White" : "Colour"],
                   ["Selected Pages", parsedRange.displayText],
-                  ["Assigned Machine", mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"],
+                  [
+                    "Assigned Machine",
+                    mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290",
+                  ],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <p className="text-muted-foreground">{label}</p>
@@ -632,7 +846,9 @@ function StudentPrintFlow() {
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                   <span className="font-semibold text-foreground">Total Payable</span>
-                  <span className="font-display text-2xl font-bold tracking-tight text-primary">₹{total}</span>
+                  <span className="font-display text-2xl font-bold tracking-tight text-primary">
+                    ₹{total}
+                  </span>
                 </div>
               </div>
             </div>
@@ -640,8 +856,13 @@ function StudentPrintFlow() {
             {/* Optional contact for pickup */}
             <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
               <div>
-                <p className="font-display font-semibold text-sm text-foreground">Contact for pickup <span className="font-normal text-muted-foreground">(optional)</span></p>
-                <p className="text-xs text-muted-foreground mt-0.5">So the shop can call you when your print is ready.</p>
+                <p className="font-display font-semibold text-sm text-foreground">
+                  Contact for pickup{" "}
+                  <span className="font-normal text-muted-foreground">(optional)</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  So the shop can call you when your print is ready.
+                </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input
@@ -669,7 +890,12 @@ function StudentPrintFlow() {
               <Button variant="ghost" onClick={() => setStep(2)} className="gap-1.5">
                 <ChevronLeft className="size-4" /> Back
               </Button>
-              <Button size="lg" disabled={paying} onClick={handlePayment} className="gap-2 shadow-xs">
+              <Button
+                size="lg"
+                disabled={paying}
+                onClick={handlePayment}
+                className="gap-2 shadow-xs"
+              >
                 {paying ? "Submitting Order…" : "Submit Print Order"}
               </Button>
             </div>
@@ -682,12 +908,16 @@ function StudentPrintFlow() {
             <span className="mx-auto grid size-20 place-items-center rounded-2xl bg-primary/10 text-primary shadow-xs">
               <CheckCircle2 className="size-10" />
             </span>
-            <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-primary">Order Dispatched</p>
+            <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-primary">
+              Order Dispatched
+            </p>
             <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               You're in the queue.
             </h1>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              Order <strong className="text-foreground font-mono">#{createdOrder?.id || "2762"}</strong> is now queued for printing on{" "}
+              Order{" "}
+              <strong className="text-foreground font-mono">#{createdOrder?.id || "2762"}</strong>{" "}
+              is now queued for printing on{" "}
               {mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}.
             </p>
 
@@ -699,7 +929,9 @@ function StudentPrintFlow() {
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <div>
                   <span className="text-xs font-medium text-foreground">Pickup & Order Code</span>
-                  <p className="text-[11px] text-muted-foreground">Single 4-digit code for counter pickup & tracking</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Single 4-digit code for counter pickup & tracking
+                  </p>
                 </div>
                 <span className="font-display text-3xl font-bold tracking-widest text-primary font-mono">
                   {createdOrder?.id || "2762"}
@@ -712,7 +944,11 @@ function StudentPrintFlow() {
                   size="sm"
                   onClick={() => {
                     const code = createdOrder?.id || "2762";
-                    if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+                    if (
+                      typeof navigator !== "undefined" &&
+                      navigator.clipboard &&
+                      typeof navigator.clipboard.writeText === "function"
+                    ) {
                       navigator.clipboard
                         .writeText(code)
                         .then(() => {
@@ -809,10 +1045,14 @@ function Choice({
         {selected && <Check className="size-3" />}
       </span>
       <span>
-        <span className={`block text-xs font-semibold ${selected ? "text-foreground" : "text-foreground"}`}>
+        <span
+          className={`block text-xs font-semibold ${selected ? "text-foreground" : "text-foreground"}`}
+        >
           {label}
         </span>
-        <span className="mt-0.5 block text-[11px] text-muted-foreground leading-snug">{detail}</span>
+        <span className="mt-0.5 block text-[11px] text-muted-foreground leading-snug">
+          {detail}
+        </span>
       </span>
     </button>
   );

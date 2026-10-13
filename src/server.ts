@@ -47,6 +47,27 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const reqUrl = new URL(request.url);
+      if (reqUrl.pathname === "/api/proxy-document") {
+        const targetUrl = reqUrl.searchParams.get("url");
+        if (!targetUrl) return new Response("Missing url", { status: 400 });
+        try {
+          const upstream = await fetch(targetUrl);
+          if (!upstream.ok) {
+            return new Response(`Upstream fetch failed: ${upstream.status}`, {
+              status: upstream.status,
+            });
+          }
+          const headers = new Headers();
+          headers.set("Content-Type", upstream.headers.get("content-type") || "application/pdf");
+          headers.set("Access-Control-Allow-Origin", "*");
+          headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+          return new Response(upstream.body, { status: 200, headers });
+        } catch (err: any) {
+          return new Response(err.message, { status: 500 });
+        }
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

@@ -58,7 +58,9 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
           <h1 className="mt-5 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Sophy <span className="text-primary font-bold">Print</span>
           </h1>
-          <p className="mt-1.5 text-xs text-muted-foreground">Operator & Shop Administration Portal</p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Operator & Shop Administration Portal
+          </p>
         </div>
 
         {/* Card Form */}
@@ -68,8 +70,12 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
               <Lock className="size-3.5" />
             </span>
             <div>
-              <h2 className="font-display text-sm font-semibold text-foreground">Sign In to Dashboard</h2>
-              <p className="text-[11px] text-muted-foreground">Restricted to authorized operators only</p>
+              <h2 className="font-display text-sm font-semibold text-foreground">
+                Sign In to Dashboard
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                Restricted to authorized operators only
+              </p>
             </div>
           </div>
 
@@ -126,7 +132,11 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
             </div>
 
             <div className="pt-2">
-              <Button type="submit" disabled={loading} className="w-full gap-2 shadow-xs h-10 text-xs font-semibold">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full gap-2 shadow-xs h-10 text-xs font-semibold"
+              >
                 {loading ? (
                   <>Verifying Credentials…</>
                 ) : (

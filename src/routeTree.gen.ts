@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TrackRouteImport } from './routes/track'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminMachinesRouteImport } from './routes/admin.machines'
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrackRoute = TrackRouteImport.update({
@@ -74,6 +80,7 @@ const AdminStorageRoute = AdminStorageRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/track': typeof TrackRoute
   '/admin/machines': typeof AdminMachinesRoute
   '/admin/orders': typeof AdminOrdersRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/templates': typeof TemplatesRoute
   '/track': typeof TrackRoute
   '/admin/machines': typeof AdminMachinesRoute
   '/admin/orders': typeof AdminOrdersRoute
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/track': typeof TrackRoute
   '/admin/machines': typeof AdminMachinesRoute
   '/admin/orders': typeof AdminOrdersRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/templates'
     | '/track'
     | '/admin/machines'
     | '/admin/orders'
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/templates'
     | '/track'
     | '/admin/machines'
     | '/admin/orders'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/templates'
     | '/track'
     | '/admin/machines'
     | '/admin/orders'
@@ -148,6 +160,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  TemplatesRoute: typeof TemplatesRoute
   TrackRoute: typeof TrackRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/track': {
@@ -251,6 +271,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  TemplatesRoute: TemplatesRoute,
   TrackRoute: TrackRoute,
 }
 export const routeTree = rootRouteImport

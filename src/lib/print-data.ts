@@ -14,7 +14,8 @@ import {
 import { deleteObject, ref } from "firebase/storage";
 import { db, storage } from "./firebase";
 
-export type JobStatus = "Pending" | "Waiting" | "Printing" | "Ready" | "Completed" | "Failed" | "Paused" | "Purged";
+export type JobStatus =
+  "Pending" | "Waiting" | "Printing" | "Ready" | "Completed" | "Failed" | "Paused" | "Purged";
 
 export type PrintJob = {
   id: string;
@@ -152,7 +153,7 @@ export function subscribeToOrders(callback: (jobs: PrintJob[]) => void): () => v
       (err) => {
         console.info("Firestore live subscription fallback to local cache:", err);
         callback(getStoredPrintJobs());
-      }
+      },
     );
     return unsubscribe;
   } catch (err) {
@@ -200,7 +201,7 @@ export async function generateUniquePickupCode(): Promise<string> {
   const localOccupied = new Set(
     getStoredPrintJobs()
       .filter((j) => activeStatuses.includes(j.status))
-      .map((j) => (j.id || j.pickupCode || "").toString().toUpperCase())
+      .map((j) => (j.id || j.pickupCode || "").toString().toUpperCase()),
   );
 
   let attempts = 0;
@@ -236,7 +237,7 @@ export async function createPrintOrder(
   order: Omit<PrintJob, "id" | "placed" | "pickupCode"> & {
     id?: string;
     pickupCode?: string;
-  }
+  },
 ): Promise<PrintJob> {
   // Use the exact same 4-digit number for BOTH the Order ID and the Pickup Code
   const code = order.id || order.pickupCode || (await generateUniquePickupCode());
@@ -255,7 +256,7 @@ export async function createPrintOrder(
 
   // Strip any undefined keys so Firestore setDoc never throws Unsupported field value: undefined
   const firestoreData = Object.fromEntries(
-    Object.entries(newJob).filter(([_, v]) => v !== undefined)
+    Object.entries(newJob).filter(([_, v]) => v !== undefined),
   );
 
   // Firestore is the primary source of truth — write here first
@@ -323,7 +324,7 @@ export async function purgeFileFromStorage(jobId: string, storagePath?: string):
           status: "Purged" as JobStatus,
           purgedAt: nowIso,
         }
-      : j
+      : j,
   );
   saveStoredPrintJobs(updated);
 }
@@ -333,7 +334,7 @@ export async function purgeFileFromStorage(jobId: string, storagePath?: string):
  */
 export async function purgeFilesByDateRange(
   startDateStr: string,
-  endDateStr: string
+  endDateStr: string,
 ): Promise<{ purgedCount: number; errors: string[] }> {
   const startTime = new Date(startDateStr).setHours(0, 0, 0, 0);
   const endTime = new Date(endDateStr).setHours(23, 59, 59, 999);
@@ -418,8 +419,7 @@ export async function fetchOrderById(id: string): Promise<PrintJob | undefined> 
   // 3. Fallback: Local stored jobs
   const localMatch = getStoredPrintJobs().find(
     (j) =>
-      j.id.toUpperCase() === cleanId ||
-      (j.pickupCode && j.pickupCode.toUpperCase() === cleanId)
+      j.id.toUpperCase() === cleanId || (j.pickupCode && j.pickupCode.toUpperCase() === cleanId),
   );
   return localMatch;
 }
@@ -429,7 +429,7 @@ export async function fetchOrderById(id: string): Promise<PrintJob | undefined> 
  */
 export function subscribeToOrderById(
   id: string,
-  callback: (job: PrintJob | null) => void
+  callback: (job: PrintJob | null) => void,
 ): () => void {
   const cleanId = id.replace("#", "").trim().toUpperCase();
   if (!cleanId) {
@@ -464,12 +464,12 @@ export function subscribeToOrderById(
                     const local = getStoredPrintJobs().find(
                       (j) =>
                         j.id.toUpperCase() === cleanId ||
-                        (j.pickupCode && j.pickupCode.toUpperCase() === cleanId)
+                        (j.pickupCode && j.pickupCode.toUpperCase() === cleanId),
                     );
                     callback(local || null);
                   }
                 },
-                () => callback(null)
+                () => callback(null),
               );
             } catch {
               callback(null);
@@ -482,10 +482,10 @@ export function subscribeToOrderById(
         const local = getStoredPrintJobs().find(
           (j) =>
             j.id.toUpperCase() === cleanId ||
-            (j.pickupCode && j.pickupCode.toUpperCase() === cleanId)
+            (j.pickupCode && j.pickupCode.toUpperCase() === cleanId),
         );
         callback(local || null);
-      }
+      },
     );
 
     return () => {
@@ -502,7 +502,10 @@ export function subscribeToOrderById(
 /**
  * Parses user-entered page numbers like "1-5, 8, 11-14", "odd", "even", or "all"
  */
-export function parsePageRange(rangeStr: string, totalPages: number): {
+export function parsePageRange(
+  rangeStr: string,
+  totalPages: number,
+): {
   isValid: boolean;
   selectedPages: number[];
   count: number;
@@ -512,17 +515,32 @@ export function parsePageRange(rangeStr: string, totalPages: number): {
   const trimmed = rangeStr.trim().toLowerCase();
   if (!trimmed || trimmed === "all") {
     const all = Array.from({ length: totalPages }, (_, i) => i + 1);
-    return { isValid: true, selectedPages: all, count: totalPages, displayText: `All pages (1–${totalPages})` };
+    return {
+      isValid: true,
+      selectedPages: all,
+      count: totalPages,
+      displayText: `All pages (1–${totalPages})`,
+    };
   }
 
   if (trimmed === "odd") {
     const odd = Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => p % 2 !== 0);
-    return { isValid: true, selectedPages: odd, count: odd.length, displayText: `Odd pages only (${odd.length} pages)` };
+    return {
+      isValid: true,
+      selectedPages: odd,
+      count: odd.length,
+      displayText: `Odd pages only (${odd.length} pages)`,
+    };
   }
 
   if (trimmed === "even") {
     const even = Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => p % 2 === 0);
-    return { isValid: true, selectedPages: even, count: even.length, displayText: `Even pages only (${even.length} pages)` };
+    return {
+      isValid: true,
+      selectedPages: even,
+      count: even.length,
+      displayText: `Even pages only (${even.length} pages)`,
+    };
   }
 
   const parts = trimmed.split(/[,;\s]+/).filter(Boolean);
@@ -536,7 +554,13 @@ export function parsePageRange(rangeStr: string, totalPages: number): {
       const start = parseInt(startStr, 10);
       const end = parseInt(endStr, 10);
       if (isNaN(start) || isNaN(end) || start < 1 || end < start) {
-        return { isValid: false, selectedPages: [], count: 0, displayText: "", error: `Invalid range: "${part}"` };
+        return {
+          isValid: false,
+          selectedPages: [],
+          count: 0,
+          displayText: "",
+          error: `Invalid range: "${part}"`,
+        };
       }
       for (let p = start; p <= Math.min(end, totalPages); p++) {
         set.add(p);
@@ -544,7 +568,13 @@ export function parsePageRange(rangeStr: string, totalPages: number): {
     } else {
       const single = parseInt(part, 10);
       if (isNaN(single) || single < 1 || single > totalPages) {
-        return { isValid: false, selectedPages: [], count: 0, displayText: "", error: `Page ${part} exceeds document (1–${totalPages})` };
+        return {
+          isValid: false,
+          selectedPages: [],
+          count: 0,
+          displayText: "",
+          error: `Page ${part} exceeds document (1–${totalPages})`,
+        };
       }
       set.add(single);
     }
@@ -552,7 +582,13 @@ export function parsePageRange(rangeStr: string, totalPages: number): {
 
   const sorted = Array.from(set).sort((a, b) => a - b);
   if (sorted.length === 0) {
-    return { isValid: false, selectedPages: [], count: 0, displayText: "", error: "No valid pages specified" };
+    return {
+      isValid: false,
+      selectedPages: [],
+      count: 0,
+      displayText: "",
+      error: "No valid pages specified",
+    };
   }
 
   return {
@@ -569,7 +605,7 @@ export function calculateJobPrice(
   mode: "bw" | "colour",
   sides: "single" | "double",
   paper: "A4" | "A3",
-  config?: PricingConfig
+  config?: PricingConfig,
 ): { total: number; subtotal: number; platformFee: number; sheets: number; unitRate: number } {
   const cfg = config || getPricingConfig();
   const sheets = sides === "double" ? Math.ceil(pages / 2) : pages;
@@ -633,14 +669,28 @@ export const navItems = [
 
 export const PRINTABLE_EXTENSIONS = [".pdf", ".docx", ".doc", ".pptx", ".ppt"] as const;
 export const NON_PRINTABLE_EXTENSIONS = [
-  ".mp3", ".mp4", ".wav", ".m4a", ".aac", ".flac", ".ogg",
-  ".avi", ".mkv", ".mov", ".webm", ".wmv", ".exe", ".zip",
-  ".rar", ".apk", ".iso"
+  ".mp3",
+  ".mp4",
+  ".wav",
+  ".m4a",
+  ".aac",
+  ".flac",
+  ".ogg",
+  ".avi",
+  ".mkv",
+  ".mov",
+  ".webm",
+  ".wmv",
+  ".exe",
+  ".zip",
+  ".rar",
+  ".apk",
+  ".iso",
 ] as const;
 
 export function validatePrintableFile(
   fileName: string,
-  mimeType?: string
+  mimeType?: string,
 ): { isValid: boolean; error?: string } {
   const lower = fileName.toLowerCase().trim();
   const isMedia =
@@ -655,8 +705,7 @@ export function validatePrintableFile(
   }
 
   const isPrintable =
-    PRINTABLE_EXTENSIONS.some((ext) => lower.endsWith(ext)) ||
-    mimeType === "application/pdf";
+    PRINTABLE_EXTENSIONS.some((ext) => lower.endsWith(ext)) || mimeType === "application/pdf";
 
   if (!isPrintable) {
     return {

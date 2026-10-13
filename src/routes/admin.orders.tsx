@@ -33,7 +33,9 @@ function OrdersPage() {
 
   const jobs = useMemo(() => {
     return allJobs.filter((j) =>
-      `${j.id} ${j.file} ${j.student} ${j.pickupCode || ""}`.toLowerCase().includes(query.toLowerCase())
+      `${j.id} ${j.file} ${j.student} ${j.pickupCode || ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
     );
   }, [allJobs, query]);
 
@@ -41,7 +43,12 @@ function OrdersPage() {
     const csvContent =
       "data:text/csv;charset=utf-8," +
       "Order,Document,Pages,Copies,Student,Placed,Amount,PickupCode,Status\n" +
-      jobs.map((j) => `${j.id},${j.file},${j.pages},${j.copies},${j.student},${j.placed},${j.amount},${j.pickupCode || ""},${j.status}`).join("\n");
+      jobs
+        .map(
+          (j) =>
+            `${j.id},${j.file},${j.pages},${j.copies},${j.student},${j.placed},${j.amount},${j.pickupCode || ""},${j.status}`,
+        )
+        .join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -56,7 +63,13 @@ function OrdersPage() {
       title="Order History"
       eyebrow={`${allJobs.length} orders recorded`}
       action={
-        <Button variant="outline" size="sm" onClick={exportOrdersCSV} disabled={jobs.length === 0} className="gap-1.5 shadow-xs">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportOrdersCSV}
+          disabled={jobs.length === 0}
+          className="gap-1.5 shadow-xs"
+        >
           <Download className="size-3.5" />
           Export Orders
         </Button>
@@ -78,7 +91,9 @@ function OrdersPage() {
             <div className="p-12 text-center text-xs text-muted-foreground">
               <p className="font-semibold text-foreground text-sm">No orders found</p>
               <p className="mt-1">
-                {query ? "No orders match your search query." : "Zero orders in queue. New student orders appear here live."}
+                {query
+                  ? "No orders match your search query."
+                  : "Zero orders in queue. New student orders appear here live."}
               </p>
             </div>
           ) : (
@@ -101,11 +116,15 @@ function OrdersPage() {
                     <td className="p-4 font-mono font-bold text-foreground">#{job.id}</td>
                     <td className="p-4 font-medium text-foreground">
                       <div>{job.file}</div>
-                      <div className="text-[11px] text-muted-foreground">{job.type} · {job.pages} pages</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {job.type} · {job.pages} pages
+                      </div>
                     </td>
                     <td className="p-4 text-muted-foreground">{job.student}</td>
                     <td className="p-4 text-muted-foreground text-xs">{job.placed}</td>
-                    <td className="p-4 font-mono text-xs font-semibold text-primary">{job.pickupCode}</td>
+                    <td className="p-4 font-mono text-xs font-semibold text-primary">
+                      {job.pickupCode}
+                    </td>
                     <td className="p-4 font-semibold text-foreground">₹{job.amount}</td>
                     <td className="p-4">
                       <span

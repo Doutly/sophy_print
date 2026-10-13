@@ -39,7 +39,7 @@ export async function authenticateAdmin(email: string, password: string): Promis
           role: "admin",
           lastLogin: new Date().toISOString(),
         },
-        { merge: true }
+        { merge: true },
       );
     } catch {
       // offline fallback
@@ -70,13 +70,18 @@ export async function authenticateAdmin(email: string, password: string): Promis
         });
 
         if (typeof window !== "undefined") {
-          localStorage.setItem(LOCAL_ADMIN_KEY, JSON.stringify({ uid: newUser.uid, email: newUser.email }));
+          localStorage.setItem(
+            LOCAL_ADMIN_KEY,
+            JSON.stringify({ uid: newUser.uid, email: newUser.email }),
+          );
         }
 
         return newUser;
       } catch (createErr: any) {
         if (createErr.code === "auth/email-already-in-use") {
-          throw new Error("Invalid password for this administrator account. Please re-enter your password.");
+          throw new Error(
+            "Invalid password for this administrator account. Please re-enter your password.",
+          );
         }
         throw new Error(createErr.message || "Could not authenticate admin account in Firebase.");
       }
@@ -127,7 +132,10 @@ export function useAdminAuth(): {
       setUser(currentUser);
       setLoading(false);
       if (currentUser && typeof window !== "undefined") {
-        localStorage.setItem(LOCAL_ADMIN_KEY, JSON.stringify({ uid: currentUser.uid, email: currentUser.email }));
+        localStorage.setItem(
+          LOCAL_ADMIN_KEY,
+          JSON.stringify({ uid: currentUser.uid, email: currentUser.email }),
+        );
       }
     });
 

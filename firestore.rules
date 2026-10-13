@@ -6,15 +6,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Orders collection:
+    // - Students can submit orders from mobile/desktop
+    // - Students can track their order by ID or pickup code
+    // - Admin and local shop print gateway can query and update status
+    // - Deletion requires admin auth
     match /orders/{orderId} {
-      // Anyone can create a new order (must start in Pending status)
-      allow create: if request.resource.data.status == "Pending";
+      allow create: if true;
+      allow get, list: if true;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
 
-      // Anyone can read a single order by ID (students tracking their own order from any device)
-      allow get: if true;
-
-      // Only admins can list all orders, update status, or delete
-      allow list, update, delete: if isAdmin();
+    // Gateways collection:
+    // Allows shop PC print agent to send heartbeats and admin dashboard to monitor live status
+    match /gateways/{gatewayId} {
+      allow read, write: if true;
     }
 
     // Public pricing configuration so students on any device get current rates
@@ -23,7 +30,17 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Other collections (users, etc.) only accessible by admin
+    // Templates Gallery collection (Project front pages, lab reports, cover sheets)
+    match /templates/{templateId} {
+      allow read, write: if true;
+    }
+
+    // Admin user records
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Default fallback
     match /{document=**} {
       allow read, write: if isAdmin();
     }

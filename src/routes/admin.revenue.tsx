@@ -1,5 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowUpRight, Banknote, Calendar, Download, PieChart, Printer, TrendingUp, Users } from "lucide-react";
+import {
+  ArrowUpRight,
+  Banknote,
+  Calendar,
+  Download,
+  PieChart,
+  Printer,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { Button } from "@/components/ui/button";
@@ -9,7 +18,11 @@ export const Route = createFileRoute("/admin/revenue")({
   head: () => ({
     meta: [
       { title: "Revenue & Analytics — Sophy Print" },
-      { name: "description", content: "Campus print revenue analytics, earnings breakdown, and machine financial metrics." },
+      {
+        name: "description",
+        content:
+          "Campus print revenue analytics, earnings breakdown, and machine financial metrics.",
+      },
       { property: "og:title", content: "Revenue & Analytics — Sophy Print" },
       { property: "og:description", content: "Financial analytics and machine volume breakdown." },
       { property: "og:type", content: "website" },
@@ -58,7 +71,18 @@ function RevenuePage() {
 
   // Real hourly distribution
   const hourlyRevenue = useMemo(() => {
-    const hours = ["8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM"];
+    const hours = [
+      "8 AM",
+      "9 AM",
+      "10 AM",
+      "11 AM",
+      "12 PM",
+      "1 PM",
+      "2 PM",
+      "3 PM",
+      "4 PM",
+      "5 PM",
+    ];
     const hourAmounts = new Array(hours.length).fill(0);
     const hourJobs = new Array(hours.length).fill(0);
 
@@ -89,9 +113,11 @@ function RevenuePage() {
         j.type === "B&W" ||
         j.printer?.includes("Canon") ||
         j.printer?.includes("4545i") ||
-        j.printer?.includes("Kyocera")
+        j.printer?.includes("Kyocera"),
     );
-    const colourJobs = filteredJobs.filter((j) => j.type === "Colour" || j.printer?.includes("Epson"));
+    const colourJobs = filteredJobs.filter(
+      (j) => j.type === "Colour" || j.printer?.includes("Epson"),
+    );
 
     const bwRevenue = bwJobs.reduce((acc, j) => acc + (j.amount || 0), 0);
     const colourRevenue = colourJobs.reduce((acc, j) => acc + (j.amount || 0), 0);
@@ -121,7 +147,10 @@ function RevenuePage() {
       "data:text/csv;charset=utf-8," +
       "Order,Date,Document,Type,Pages,Copies,Amount,Status\n" +
       filteredJobs
-        .map((j) => `${j.id},${j.placed},${j.file},${j.type},${j.pages},${j.copies},${j.amount},${j.status}`)
+        .map(
+          (j) =>
+            `${j.id},${j.placed},${j.file},${j.type},${j.pages},${j.copies},${j.amount},${j.status}`,
+        )
         .join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -173,7 +202,11 @@ function RevenuePage() {
               </span>
             </div>
             <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {timeRange === "today" ? "Today's Gross" : timeRange === "week" ? "Last 7 Days" : "Last 30 Days"}
+              {timeRange === "today"
+                ? "Today's Gross"
+                : timeRange === "week"
+                  ? "Last 7 Days"
+                  : "Last 30 Days"}
             </p>
             <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
               ₹{metrics.gross.toLocaleString("en-IN")}
@@ -186,13 +219,19 @@ function RevenuePage() {
               <span className="grid size-9 place-items-center rounded-lg bg-secondary text-foreground">
                 <Printer className="size-4.5" />
               </span>
-              <span className="text-xs font-medium text-muted-foreground">{metrics.totalJobs} total</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {metrics.totalJobs} total
+              </span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Jobs Processed</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Jobs Processed
+            </p>
             <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
               {metrics.totalJobs}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">{metrics.sheets} physical sheets printed</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {metrics.sheets} physical sheets printed
+            </p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
@@ -202,8 +241,12 @@ function RevenuePage() {
               </span>
               <span className="text-xs font-medium text-muted-foreground">Per order</span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg Order Value</p>
-            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">₹{metrics.avgOrder}</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Avg Order Value
+            </p>
+            <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
+              ₹{metrics.avgOrder}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">Computed from actual transactions</p>
           </div>
 
@@ -214,7 +257,9 @@ function RevenuePage() {
               </span>
               <span className="text-xs font-semibold text-primary">Unique</span>
             </div>
-            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Student Users</p>
+            <p className="mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Student Users
+            </p>
             <p className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">
               {metrics.uniqueStudents}
             </p>
@@ -228,7 +273,9 @@ function RevenuePage() {
           <section className="rounded-xl border border-border bg-card p-6 shadow-xs">
             <div className="flex items-center justify-between pb-4 border-b border-border">
               <div>
-                <h2 className="font-display text-lg font-semibold text-foreground">Hourly Revenue Curve</h2>
+                <h2 className="font-display text-lg font-semibold text-foreground">
+                  Hourly Revenue Curve
+                </h2>
                 <p className="text-xs text-muted-foreground">Live throughput & payment volume</p>
               </div>
               <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -238,7 +285,10 @@ function RevenuePage() {
 
             <div className="mt-8 flex h-52 items-end gap-3 px-2">
               {hourlyRevenue.map((item) => (
-                <div key={item.hour} className="group relative flex flex-1 flex-col items-center h-full justify-end">
+                <div
+                  key={item.hour}
+                  className="group relative flex flex-1 flex-col items-center h-full justify-end"
+                >
                   {/* Tooltip on hover */}
                   <div className="absolute -top-12 z-10 hidden rounded-md border border-border bg-card px-2.5 py-1 text-center shadow-md group-hover:block whitespace-nowrap">
                     <p className="text-[11px] font-bold text-foreground">₹{item.amount}</p>
@@ -247,11 +297,15 @@ function RevenuePage() {
                   {/* Bar */}
                   <div
                     className={`w-full rounded-t-md transition-all duration-200 ${
-                      item.amount > 0 ? "bg-primary group-hover:bg-primary/80" : "bg-secondary group-hover:bg-secondary/80"
+                      item.amount > 0
+                        ? "bg-primary group-hover:bg-primary/80"
+                        : "bg-secondary group-hover:bg-secondary/80"
                     }`}
                     style={{ height: `${item.percentage}%` }}
                   />
-                  <span className="mt-2 text-[10px] font-medium text-muted-foreground">{item.hour}</span>
+                  <span className="mt-2 text-[10px] font-medium text-muted-foreground">
+                    {item.hour}
+                  </span>
                 </div>
               ))}
             </div>
@@ -268,7 +322,9 @@ function RevenuePage() {
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-border">
                 <div>
-                  <h2 className="font-display text-lg font-semibold text-foreground">Machine Contribution</h2>
+                  <h2 className="font-display text-lg font-semibold text-foreground">
+                    Machine Contribution
+                  </h2>
                   <p className="text-xs text-muted-foreground">Share of shop volume & revenue</p>
                 </div>
                 <PieChart className="size-4 text-primary" />
@@ -279,8 +335,12 @@ function RevenuePage() {
                 <div className="rounded-lg border border-border bg-secondary/30 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-display text-sm font-semibold text-foreground">Canon imageRUNNER ADVANCE 4545i III</p>
-                      <p className="text-xs text-muted-foreground">Dual LAN monochrome xerox copiers (45 PPM)</p>
+                      <p className="font-display text-sm font-semibold text-foreground">
+                        Canon imageRUNNER ADVANCE 4545i III
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Dual LAN monochrome xerox copiers (45 PPM)
+                      </p>
                     </div>
                     <span className="font-display text-lg font-bold text-foreground">
                       ₹{machineBreakdown.canonBw.revenue.toLocaleString("en-IN")}
@@ -306,7 +366,9 @@ function RevenuePage() {
                 <div className="rounded-lg border border-border bg-primary/5 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-display text-sm font-semibold text-foreground">Epson L5290 Series</p>
+                      <p className="font-display text-sm font-semibold text-foreground">
+                        Epson L5290 Series
+                      </p>
                       <p className="text-xs text-muted-foreground">High-margin colour prints</p>
                     </div>
                     <span className="font-display text-lg font-bold text-primary">

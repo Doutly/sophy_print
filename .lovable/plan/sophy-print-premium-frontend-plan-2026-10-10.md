@@ -1,6 +1,7 @@
 # Sophy Print — Premium Frontend Plan
 
 ## Goal
+
 Build the complete frontend first: a premium, mobile-first printing experience students can complete in three clear steps, plus an operational shop-admin workspace. Firebase, real payments, printer communication, and persistent data will be connected later.
 
 ## Student experience

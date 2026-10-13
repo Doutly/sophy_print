@@ -1,10 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, CheckCircle2, MoreHorizontal, Pause, Play, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  MoreHorizontal,
+  Pause,
+  Play,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getStoredPrintJobs, subscribeToOrders, updateJobStatus, type JobStatus, type PrintJob } from "@/lib/print-data";
+import {
+  getStoredPrintJobs,
+  subscribeToOrders,
+  updateJobStatus,
+  type JobStatus,
+  type PrintJob,
+} from "@/lib/print-data";
 
 export const Route = createFileRoute("/admin/queue")({
   head: () => ({
@@ -37,12 +52,17 @@ function QueuePage() {
   };
 
   const filteredJobs = jobs.filter((job) => {
-    const matchesQuery = `${job.id} ${job.file} ${job.student} ${job.pickupCode}`.toLowerCase().includes(query.toLowerCase());
-    const matchesStatus = statusFilter === "all" || job.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchesQuery = `${job.id} ${job.file} ${job.student} ${job.pickupCode}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || job.status.toLowerCase() === statusFilter.toLowerCase();
     return matchesQuery && matchesStatus;
   });
 
-  const activeCount = jobs.filter((j) => j.status === "Printing" || j.status === "Waiting" || j.status === "Pending").length;
+  const activeCount = jobs.filter(
+    (j) => j.status === "Printing" || j.status === "Waiting" || j.status === "Pending",
+  ).length;
 
   return (
     <AdminShell
@@ -200,5 +220,9 @@ function StatusBadge({ status }: { status: JobStatus }) {
     Purged: "bg-secondary text-muted-foreground border border-border",
   };
 
-  return <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${styles[status]}`}>{status}</span>;
+  return (
+    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${styles[status]}`}>
+      {status}
+    </span>
+  );
 }

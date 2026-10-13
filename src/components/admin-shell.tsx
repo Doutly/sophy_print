@@ -23,7 +23,14 @@ import { getStoredPrintJobs, subscribeToOrders, type PrintJob } from "@/lib/prin
 
 interface NavItem {
   label: string;
-  to: "/admin" | "/admin/queue" | "/admin/storage" | "/admin/machines" | "/admin/orders" | "/admin/pricing" | "/admin/revenue";
+  to:
+    | "/admin"
+    | "/admin/queue"
+    | "/admin/storage"
+    | "/admin/machines"
+    | "/admin/orders"
+    | "/admin/pricing"
+    | "/admin/revenue";
   icon: LucideIcon;
 }
 
@@ -107,7 +114,10 @@ export function AdminShell({
         <div className="flex h-full flex-col">
           {/* Brand header */}
           <div className="flex h-14 items-center justify-between px-2">
-            <Link to="/" className="flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight text-foreground">
+            <Link
+              to="/"
+              className="flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight text-foreground"
+            >
               <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground shadow-xs">
                 <Printer className="size-4.5" />
               </span>
@@ -203,7 +213,9 @@ export function AdminShell({
               <Menu className="size-4" />
             </Button>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">{eyebrow}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                {eyebrow}
+              </p>
               <h1 className="truncate font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                 {title}
               </h1>

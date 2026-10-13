@@ -199,5 +199,3 @@ describe("Unified 4-Digit Order ID & Pickup Code", () => {
     expect(order.id).toMatch(/^[1-9][0-9]{3}$/);
   });
 });
-
-
