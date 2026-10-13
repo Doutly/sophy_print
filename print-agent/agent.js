@@ -97,13 +97,29 @@ function printDocumentToPrinter(filePath, printerName) {
       `[PRINT] 🖨️ Submitting "${path.basename(filePath)}" to printer "${printerName}" (LAN Spooler)...`,
     );
 
-    // Use Windows PowerShell to dispatch to the named Windows printer driver
-    const psCommand = `Start-Process -FilePath "${filePath}" -Verb PrintTo -ArgumentList '"${printerName}"' -PassThru | Out-Null`;
+    // Escape single quotes for PowerShell script block
+    const safeFilePath = filePath.replace(/'/g, "''");
+    const safePrinterName = (printerName || "").replace(/'/g, "''");
 
-    exec(`powershell.exe -NoProfile -Command "${psCommand}"`, (error) => {
+    const psScript = `
+      $path = '${safeFilePath}';
+      $printer = '${safePrinterName}';
+      try {
+        if ($printer) {
+          Start-Process -FilePath $path -Verb PrintTo -ArgumentList ('"' + $printer + '"') -PassThru | Out-Null
+        } else {
+          Start-Process -FilePath $path -Verb Print -PassThru | Out-Null
+        }
+      } catch {
+        Start-Process -FilePath $path -Verb Print -PassThru | Out-Null
+      }
+    `.replace(/\r?\n\s*/g, " ");
+
+    const encoded = Buffer.from(psScript, "utf16le").toString("base64");
+
+    exec(`powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${encoded}`, (error) => {
       if (error) {
-        console.warn(`[PRINT WARNING] Windows PrintTo command notice: ${error.message}`);
-        // Often on Windows, the print dialog completes via default association
+        console.warn(`[PRINT NOTICE] Windows Print command notice: ${error.message}`);
       }
       console.log(
         `[PRINT SUCCESS] ✓ Job successfully received by Windows Print Spooler for "${printerName}".`,
@@ -167,8 +183,8 @@ function listenToPrintQueue() {
   console.log("👂 Listening for incoming print jobs from students on campus...");
 
   const ordersRef = collection(db, "orders");
-  // Listen for orders marked "Printing" or "Waiting"
-  const q = query(ordersRef, where("status", "in", ["Printing", "Waiting"]));
+  // Listen for orders marked "Pending", "Printing", or "Waiting"
+  const q = query(ordersRef, where("status", "in", ["Pending", "Printing", "Waiting"]));
 
   onSnapshot(
     q,
@@ -214,22 +230,30 @@ function listenToPrintQueue() {
 
           processingJobs.add(orderId);
 
+          const orderDocRef = doc(db, "orders", orderId);
+
           try {
-            const localPdfPath = path.join(tempDir, `${orderId}_${orderData.file || "doc.pdf"}`);
+            // Mark status Printing in Firestore to inform admin panel
+            await updateDoc(orderDocRef, {
+              status: "Printing",
+              assignedMachine: printerTarget,
+            }).catch(() => {});
+
+            const cleanFileName = (orderData.file || "doc.pdf").replace(/[^a-zA-Z0-9.-]/g, "_");
+            const localPdfPath = path.join(tempDir, `${orderId}_${cleanFileName}`);
 
             // Download if URL provided
             if (orderData.downloadUrl) {
               console.log(`   ⬇️  Downloading PDF from Firebase Storage...`);
               await downloadFile(orderData.downloadUrl, localPdfPath);
             } else {
-              console.log(`   ℹ️  Order metadata ready for spooling.`);
+              throw new Error("No downloadUrl found for this order document.");
             }
 
             // Submit to physical printer
             await printDocumentToPrinter(localPdfPath, printerTarget);
 
             // Update order status in Firestore to "Ready"
-            const orderDocRef = doc(db, "orders", orderId);
             await updateDoc(orderDocRef, {
               status: "Ready",
               printedAt: new Date().toISOString(),
@@ -242,7 +266,6 @@ function listenToPrintQueue() {
           } catch (err) {
             console.error(`❌ [JOB FAILED] #${orderId}:`, err.message);
             try {
-              const orderDocRef = doc(db, "orders", orderId);
               await updateDoc(orderDocRef, {
                 status: "Failed",
                 failureReason: err.message,

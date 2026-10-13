@@ -3,6 +3,8 @@ import { ChevronLeft, Printer, Sparkles } from "lucide-react";
 import { TemplateGallery } from "@/components/template-gallery";
 import type { CampusTemplate, TemplateFields } from "@/lib/templates-data";
 
+import { setPendingTemplateDraft } from "@/lib/template-draft-store";
+
 export const Route = createFileRoute("/templates")({
   head: () => ({
     meta: [
@@ -34,17 +36,14 @@ function TemplatesPage() {
     generatedFileName: string;
     pageCount?: number;
   }) => {
-    // Save draft in session storage so home page picks it up immediately
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(
-        "sophy_selected_template_v1",
-        JSON.stringify({
-          template: data.template,
-          generatedFileName: data.generatedFileName,
-          pageCount: data.pageCount || 1,
-        }),
-      );
-    }
+    // Preserve full File object and metadata in memory and session
+    setPendingTemplateDraft({
+      template: data.template,
+      file: data.file,
+      generatedFileName: data.generatedFileName,
+      pageCount: data.pageCount || 1,
+      originalDownloadUrl: data.template.originalDownloadUrl,
+    });
     navigate({ to: "/" });
   };
 

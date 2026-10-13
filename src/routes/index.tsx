@@ -38,6 +38,7 @@ import {
 import { TemplateGallery } from "@/components/template-gallery";
 import { DocumentEditorCanvas } from "@/components/document-editor-canvas";
 import type { CampusTemplate } from "@/lib/templates-data";
+import { getPendingTemplateDraft } from "@/lib/template-draft-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -90,28 +91,22 @@ function StudentPrintFlow() {
   const [studentName, setStudentName] = useState("");
   const [studentPhone, setStudentPhone] = useState("");
   const [uploadMode, setUploadMode] = useState<"upload" | "gallery">("upload");
+  const [fallbackDownloadUrl, setFallbackDownloadUrl] = useState<string | null>(null);
 
   // Check if a template was picked from the /templates route
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("sophy_selected_template_v1");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed?.generatedFileName) {
-            setFileName(parsed.generatedFileName);
-            if (parsed.values?.studentName) {
-              setStudentName(parsed.values.studentName);
-            }
-            setDetectedTotalPages(1);
-            setStep(2);
-            sessionStorage.removeItem("sophy_selected_template_v1");
-            toast.success(`Loaded template: ${parsed.template?.title || "Custom Document"}`);
-          }
-        } catch {
-          // ignore
-        }
+    const draft = getPendingTemplateDraft();
+    if (draft?.generatedFileName) {
+      setFileName(draft.generatedFileName);
+      if (draft.file) {
+        setUploadedFile(draft.file);
       }
+      if (draft.originalDownloadUrl || draft.template?.originalDownloadUrl) {
+        setFallbackDownloadUrl(draft.originalDownloadUrl || draft.template?.originalDownloadUrl || null);
+      }
+      setDetectedTotalPages(draft.pageCount || 1);
+      setStep(2);
+      toast.success(`Loaded template: ${draft.template?.title || "Custom Document"}`);
     }
   }, []);
 
@@ -124,6 +119,9 @@ function StudentPrintFlow() {
     setFileName(data.generatedFileName);
     if (data.file) {
       setUploadedFile(data.file);
+    }
+    if (data.template?.originalDownloadUrl) {
+      setFallbackDownloadUrl(data.template.originalDownloadUrl);
     }
     setDetectedTotalPages(data.pageCount || 1);
     setStep(2);
@@ -198,7 +196,7 @@ function StudentPrintFlow() {
   async function handlePayment() {
     setPaying(true);
     try {
-      let downloadUrl: string | undefined = undefined;
+      let downloadUrl: string | undefined = fallbackDownloadUrl || undefined;
       let storagePath: string | undefined = undefined;
 
       // Asynchronously upload real document to Firebase Storage
