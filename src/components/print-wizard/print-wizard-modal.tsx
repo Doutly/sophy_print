@@ -117,8 +117,11 @@ export function PrintWizardModal({
   const physicalSheets = sheetMetrics.physicalSheets;
 
   // Pricing calculation
+  const isDouble = duplex !== "single";
   const unitRate =
-    colorMode === "colour" ? pricingConfig.colourPerPage : pricingConfig.bwPerPage;
+    colorMode === "colour"
+      ? (isDouble ? pricingConfig.colourDouble : pricingConfig.colourSingle)
+      : (isDouble ? pricingConfig.bwDouble : pricingConfig.bwSingle);
   const totalPrice = physicalSheets * copies * unitRate;
 
   const currentLayoutConfig: PrintLayoutConfig = {
@@ -265,8 +268,8 @@ export function PrintWizardModal({
               onChangeCopies={setCopies}
               totalPages={totalPages}
               currentPage={1}
-              bwPricePerPage={pricingConfig.bwPerPage}
-              colourPricePerPage={pricingConfig.colourPerPage}
+              bwPricePerPage={pricingConfig.bwSingle}
+              colourPricePerPage={pricingConfig.colourSingle}
             />
           )}
 

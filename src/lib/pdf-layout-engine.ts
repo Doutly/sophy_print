@@ -130,7 +130,7 @@ export function computeSheetMetrics(
  * Transforms a source PDF document applying orientation, scale, and N-up sheet grids
  */
 export async function transformPdfLayout(
-  sourceBytes: ArrayBuffer,
+  sourceBytes: ArrayBuffer | Uint8Array,
   config: PrintLayoutConfig,
   baseFileName: string = "Document.pdf",
 ): Promise<{

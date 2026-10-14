@@ -71,14 +71,14 @@ describe("PDF Layout Engine & Sheet Metrics", () => {
     const pdfBytes = await doc.save();
 
     // Transform to 2-on-1 (should produce 2 sheets)
-    const result2Up = await transformPdfLayout(pdfBytes.buffer, {
+    const result2Up = await transformPdfLayout(pdfBytes, {
       ...DEFAULT_PRINT_LAYOUT_CONFIG,
       pagesPerSheet: 2,
     });
     expect(result2Up.sheetCount).toBe(2);
 
     // Transform to 4-on-1 (2x2 grid, should produce 1 sheet)
-    const result4Up = await transformPdfLayout(pdfBytes.buffer, {
+    const result4Up = await transformPdfLayout(pdfBytes, {
       ...DEFAULT_PRINT_LAYOUT_CONFIG,
       pagesPerSheet: 4,
     });

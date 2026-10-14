@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Copy,
   Edit3,
+  Eye,
   FileCheck2,
   FileText,
   Minus,

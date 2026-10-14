@@ -105,9 +105,10 @@ export function StageSheetPreview({
         const renderContext = {
           canvasContext: context,
           viewport: viewport,
+          canvas: canvas,
         };
 
-        await page.render(renderContext).promise;
+        await page.render(renderContext as any).promise;
         if (!isCancelled) {
           setLoadingPreview(false);
         }
