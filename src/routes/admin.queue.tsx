@@ -138,7 +138,17 @@ function QueuePage() {
                   </div>
                   <span className="text-xs text-muted-foreground font-medium">{job.type}</span>
                   <span className="text-xs text-muted-foreground">
-                    {job.pages} p · {job.copies}x
+                    {job.pages} p {job.physicalSheets ? `(${job.physicalSheets} sh)` : ""} · {job.copies}x
+                    {job.pagesPerSheet && job.pagesPerSheet > 1 && (
+                      <span className="block text-[10px] text-emerald-600 font-semibold font-mono">
+                        {job.pagesPerSheet === 4 ? "2x2 N-Up" : "2-on-1"}
+                      </span>
+                    )}
+                    {job.orientation === "landscape" && (
+                      <span className="block text-[10px] text-indigo-600 font-semibold font-mono">
+                        Landscape
+                      </span>
+                    )}
                   </span>
                   <span className="font-mono text-xs font-semibold text-primary">
                     {job.pickupCode}

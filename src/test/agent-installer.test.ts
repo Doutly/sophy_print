@@ -20,6 +20,12 @@ describe("Doutly Print Agent Windows Installer (.bat)", () => {
     expect(batContent).toContain("::END_START_BAT::");
     expect(batContent).toContain("::BEGIN_AGENT_JS::");
     expect(batContent).toContain("::END_AGENT_JS::");
+    expect(batContent).toContain("::BEGIN_BACKGROUND_VBS::");
+    expect(batContent).toContain("::END_BACKGROUND_VBS::");
+    expect(batContent).toContain("::BEGIN_STOP_BAT::");
+    expect(batContent).toContain("::END_STOP_BAT::");
+    expect(batContent).toContain("::BEGIN_STATUS_BAT::");
+    expect(batContent).toContain("::END_STATUS_BAT::");
 
     // Check custom configuration injection
     expect(batContent).toContain('"gatewayId": "TEST-GATEWAY"');

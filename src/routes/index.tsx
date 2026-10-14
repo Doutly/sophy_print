@@ -39,6 +39,8 @@ import { TemplateGallery } from "@/components/template-gallery";
 import { DocumentEditorCanvas } from "@/components/document-editor-canvas";
 import type { CampusTemplate } from "@/lib/templates-data";
 import { getPendingTemplateDraft } from "@/lib/template-draft-store";
+import { PrintWizardModal } from "@/components/print-wizard/print-wizard-modal";
+import type { PrintLayoutConfig } from "@/lib/pdf-layout-engine";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -92,6 +94,8 @@ function StudentPrintFlow() {
   const [studentPhone, setStudentPhone] = useState("");
   const [uploadMode, setUploadMode] = useState<"upload" | "gallery">("upload");
   const [fallbackDownloadUrl, setFallbackDownloadUrl] = useState<string | null>(null);
+  const [documentArrayBuffer, setDocumentArrayBuffer] = useState<ArrayBuffer | null>(null);
+  const [wizardOpen, setWizardOpen] = useState<boolean>(false);
 
   // Check if a template was picked from the /templates route
   useEffect(() => {
@@ -100,9 +104,17 @@ function StudentPrintFlow() {
       setFileName(draft.generatedFileName);
       if (draft.file) {
         setUploadedFile(draft.file);
+        draft.file.arrayBuffer().then(setDocumentArrayBuffer).catch(() => {});
       }
       if (draft.originalDownloadUrl || draft.template?.originalDownloadUrl) {
-        setFallbackDownloadUrl(draft.originalDownloadUrl || draft.template?.originalDownloadUrl || null);
+        const url = draft.originalDownloadUrl || draft.template?.originalDownloadUrl || null;
+        setFallbackDownloadUrl(url);
+        if (url && !draft.file) {
+          fetch(url)
+            .then((r) => r.arrayBuffer())
+            .then(setDocumentArrayBuffer)
+            .catch(() => {});
+        }
       }
       setDetectedTotalPages(draft.pageCount || 1);
       setStep(2);
@@ -119,9 +131,13 @@ function StudentPrintFlow() {
     setFileName(data.generatedFileName);
     if (data.file) {
       setUploadedFile(data.file);
-    }
-    if (data.template?.originalDownloadUrl) {
+      data.file.arrayBuffer().then(setDocumentArrayBuffer).catch(() => {});
+    } else if (data.template?.originalDownloadUrl) {
       setFallbackDownloadUrl(data.template.originalDownloadUrl);
+      fetch(data.template.originalDownloadUrl)
+        .then((r) => r.arrayBuffer())
+        .then(setDocumentArrayBuffer)
+        .catch(() => {});
     }
     setDetectedTotalPages(data.pageCount || 1);
     setStep(2);
@@ -173,6 +189,7 @@ function StudentPrintFlow() {
     const name = file.name.toLowerCase();
     setFileName(file.name);
     setUploadedFile(file);
+    file.arrayBuffer().then(setDocumentArrayBuffer).catch(() => {});
     setAnalyzing(true);
 
     try {
@@ -238,6 +255,74 @@ function StudentPrintFlow() {
         setStep(4);
       }, 700);
     } catch {
+      setPaying(false);
+      setStep(4);
+    }
+  }
+
+  async function handleWizardConfirm(data: {
+    transformedFile: File;
+    config: PrintLayoutConfig;
+    physicalSheets: number;
+    selectedPages: number;
+    colorMode: "bw" | "colour";
+    copies: number;
+    totalAmount: number;
+    studentName: string;
+    studentPhone: string;
+  }) {
+    setUploadedFile(data.transformedFile);
+    setFileName(data.transformedFile.name);
+    setMode(data.colorMode);
+    setCopies(data.copies);
+    setSides(data.config.duplex === "single" ? "single" : "double");
+    if (data.studentName) setStudentName(data.studentName);
+    if (data.studentPhone) setStudentPhone(data.studentPhone);
+
+    setPaying(true);
+    try {
+      let downloadUrl: string | undefined = undefined;
+      let storagePath: string | undefined = undefined;
+
+      const timestamp = Date.now();
+      const cleanName = data.transformedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+      storagePath = `orders/pending/${timestamp}_${cleanName}`;
+      const storageReference = ref(storage, storagePath);
+      await uploadBytes(storageReference, data.transformedFile);
+      downloadUrl = await getDownloadURL(storageReference);
+
+      const job = await createPrintOrder({
+        file: data.transformedFile.name,
+        fileSize: data.transformedFile.size,
+        type: data.colorMode === "colour" ? "Colour" : "B&W",
+        pages: data.selectedPages,
+        totalPagesInDoc: detectedTotalPages,
+        pageRange:
+          data.config.pageRangeOption === "all"
+            ? "all"
+            : (data.config.customRangeText || "all"),
+        copies: data.copies,
+        amount: data.totalAmount,
+        status: "Pending",
+        student: data.studentName.trim() || studentName.trim() || "Anonymous",
+        phone: data.studentPhone.trim() || studentPhone.trim() || undefined,
+        sides: data.config.duplex === "single" ? "single" : "double",
+        paper: "A4",
+        orientation: data.config.orientation,
+        pagesPerSheet: data.config.pagesPerSheet,
+        physicalSheets: data.physicalSheets,
+        printer: data.colorMode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III" : "Epson L5290",
+        downloadUrl,
+        storagePath,
+      });
+
+      setCreatedOrder(job);
+      window.setTimeout(() => {
+        setPaying(false);
+        setStep(4);
+      }, 700);
+    } catch (err: any) {
+      console.error("Order creation failed:", err);
       setPaying(false);
       setStep(4);
     }
@@ -579,6 +664,36 @@ function StudentPrintFlow() {
         {step === 2 && (
           <section className="animate-rise grid gap-6 lg:grid-cols-[1fr_260px]">
             <div className="space-y-5">
+              {/* ACROBAT-STYLE 3-STAGE PRINT STUDIO HERO BANNER */}
+              <div className="rounded-2xl border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      Acrobat Standard
+                    </span>
+                    <h3 className="font-display font-bold text-base text-foreground">
+                      Step-by-Step Print Customizer Studio
+                    </h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
+                    Configure Landscape/Portrait, 2-on-1 or 2x2 multi-page paper savings, duplex flip, and preview the exact physical print sheet before payment.
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  onClick={async () => {
+                    if (!documentArrayBuffer && uploadedFile) {
+                      const b = await uploadedFile.arrayBuffer();
+                      setDocumentArrayBuffer(b);
+                    }
+                    setWizardOpen(true);
+                  }}
+                  className="gap-2 font-display font-bold text-xs bg-primary text-primary-foreground shadow-md hover:shadow-lg shrink-0 cursor-pointer"
+                >
+                  <Eye className="size-4" /> Open Print Studio & Preview
+                </Button>
+              </div>
+
               {/* PAGE RANGE SELECTION CARD */}
               <fieldset className="rounded-xl border border-border bg-card p-5 shadow-xs">
                 <div className="flex items-center justify-between mb-3">
@@ -781,18 +896,37 @@ function StudentPrintFlow() {
             </aside>
 
             {/* Step navigation buttons */}
-            <div className="flex justify-between lg:col-span-2 pt-2">
-              <Button variant="ghost" onClick={() => setStep(1)} className="gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 lg:col-span-2 pt-2">
+              <Button variant="ghost" onClick={() => setStep(1)} className="gap-1.5 cursor-pointer">
                 <ChevronLeft className="size-4" /> Back
               </Button>
-              <Button
-                size="lg"
-                disabled={!parsedRange.isValid}
-                onClick={() => setStep(3)}
-                className="gap-1.5 shadow-xs"
-              >
-                Review order <ChevronRight className="size-4" />
-              </Button>
+
+              <div className="flex items-center gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  onClick={async () => {
+                    if (!documentArrayBuffer && uploadedFile) {
+                      const b = await uploadedFile.arrayBuffer();
+                      setDocumentArrayBuffer(b);
+                    }
+                    setWizardOpen(true);
+                  }}
+                  className="gap-2 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/5 cursor-pointer"
+                >
+                  <Eye className="size-4" /> Layout & Live Preview
+                </Button>
+
+                <Button
+                  size="lg"
+                  disabled={!parsedRange.isValid}
+                  onClick={() => setStep(3)}
+                  className="gap-1.5 shadow-xs cursor-pointer font-semibold"
+                >
+                  Quick Review & Pay <ChevronRight className="size-4" />
+                </Button>
+              </div>
             </div>
           </section>
         )}
@@ -976,6 +1110,18 @@ function StudentPrintFlow() {
             </div>
           </section>
         )}
+
+        {/* Acrobat-Style 3-Stage Print Customizer Studio & Live Sheet Preview */}
+        <PrintWizardModal
+          file={uploadedFile}
+          sourceArrayBuffer={documentArrayBuffer}
+          fileName={fileName || "Document.pdf"}
+          totalPages={detectedTotalPages}
+          isOpen={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          pricingConfig={pricingConfig}
+          onConfirmPrint={handleWizardConfirm}
+        />
       </div>
     </main>
   );

@@ -34,6 +34,9 @@ export type PrintJob = {
   pickupCode: string;
   sides?: ("single" | "double") | undefined;
   paper?: ("A4" | "A3") | undefined;
+  orientation?: ("portrait" | "landscape" | "auto") | undefined;
+  pagesPerSheet?: (1 | 2 | 4) | undefined;
+  physicalSheets?: number | undefined;
   printer?: string | undefined;
   downloadUrl?: string | undefined;
   storagePath?: string | undefined;
