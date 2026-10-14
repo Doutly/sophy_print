@@ -89,12 +89,23 @@ function downloadFile(url, destPath) {
 }
 
 /**
- * Sends a PDF file to the Windows Print Spooler for a specific printer
+ * Sends a PDF file to the Windows Print Spooler for a specific printer with duplex support
  */
-function printDocumentToPrinter(filePath, printerName) {
+function printDocumentToPrinter(filePath, printerName, duplexMode = "single", copies = 1) {
   return new Promise((resolve) => {
+    // Map application duplexMode to Windows PrintManagement DuplexingMode:
+    // OneSided | TwoSidedLongEdge | TwoSidedShortEdge
+    let winDuplex = "OneSided";
+    if (duplexMode === "duplex-short") {
+      winDuplex = "TwoSidedShortEdge";
+    } else if (duplexMode === "duplex-long" || duplexMode === "double") {
+      winDuplex = "TwoSidedLongEdge";
+    }
+
+    const numCopies = Math.max(1, parseInt(copies, 10) || 1);
+
     console.log(
-      `[PRINT] 🖨️ Submitting "${path.basename(filePath)}" to printer "${printerName}" (LAN Spooler)...`,
+      `[PRINT] 🖨️ Submitting "${path.basename(filePath)}" to printer "${printerName}" [Duplex: ${winDuplex}, Copies: ${numCopies}]...`,
     );
 
     // Escape single quotes for PowerShell script block
@@ -104,16 +115,26 @@ function printDocumentToPrinter(filePath, printerName) {
     const psScript = `
       $path = '${safeFilePath}';
       $printer = '${safePrinterName}';
+      $duplex = '${winDuplex}';
+      $copies = ${numCopies};
       try {
         if ($printer) {
-          Start-Process -FilePath $path -Verb PrintTo -ArgumentList ('"' + $printer + '"') -PassThru | Out-Null
+          # Apply duplex mode to Windows Print Spooler before spooling
+          Set-PrintConfiguration -PrinterName $printer -DuplexingMode $duplex -ErrorAction SilentlyContinue
+          for ($i = 0; $i -lt $copies; $i++) {
+            Start-Process -FilePath $path -Verb PrintTo -ArgumentList ('"' + $printer + '"') -PassThru | Out-Null
+            if ($copies -gt 1) { Start-Sleep -Milliseconds 600 }
+          }
         } else {
-          Start-Process -FilePath $path -Verb Print -PassThru | Out-Null
+          for ($i = 0; $i -lt $copies; $i++) {
+            Start-Process -FilePath $path -Verb Print -PassThru | Out-Null
+            if ($copies -gt 1) { Start-Sleep -Milliseconds 600 }
+          }
         }
       } catch {
         Start-Process -FilePath $path -Verb Print -PassThru | Out-Null
       }
-    `.replace(/\r?\n\s*/g, " ");
+    `.replace(/\\r?\\n\\s*/g, " ");
 
     const encoded = Buffer.from(psScript, "utf16le").toString("base64");
 
@@ -122,7 +143,7 @@ function printDocumentToPrinter(filePath, printerName) {
         console.warn(`[PRINT NOTICE] Windows Print command notice: ${error.message}`);
       }
       console.log(
-        `[PRINT SUCCESS] ✓ Job successfully received by Windows Print Spooler for "${printerName}".`,
+        `[PRINT SUCCESS] ✓ Job successfully received by Windows Print Spooler for "${printerName}" (${winDuplex}, ${numCopies} ${numCopies === 1 ? "copy" : "copies"}).`,
       );
       resolve(true);
     });
@@ -250,8 +271,33 @@ function listenToPrintQueue() {
               throw new Error("No downloadUrl found for this order document.");
             }
 
-            // Submit to physical printer
-            await printDocumentToPrinter(localPdfPath, printerTarget);
+            // Submit to physical printer with duplex, copies, and automatic failover
+            const orderDuplex =
+              orderData.duplexMode || (orderData.sides === "double" ? "duplex-long" : "single");
+            const orderCopies = Math.max(1, parseInt(orderData.copies, 10) || 1);
+
+            try {
+              await printDocumentToPrinter(localPdfPath, printerTarget, orderDuplex, orderCopies);
+            } catch (spoolErr) {
+              const hasSecondary = !isColour && config.printers.bw_secondary;
+              if (hasSecondary) {
+                const backupTarget =
+                  printerTarget === config.printers.bw
+                    ? config.printers.bw_secondary
+                    : config.printers.bw;
+                console.warn(
+                  `⚠️ [FAILOVER ENGAGED] Primary "${printerTarget}" notice/offline. Auto-failing over #${orderId} to "${backupTarget}"...`,
+                );
+                printerTarget = backupTarget;
+                await printDocumentToPrinter(localPdfPath, printerTarget, orderDuplex, orderCopies);
+              } else {
+                throw spoolErr;
+              }
+            }
+
+            // Buffer 15 seconds to ensure physical paper has ejected into tray before notifying student
+            console.log(`   ⏳ Buffering 15s to allow physical sheets to finish ejecting into output tray...`);
+            await new Promise((r) => setTimeout(r, 15000));
 
             // Update order status in Firestore to "Ready"
             await updateDoc(orderDocRef, {
@@ -259,6 +305,11 @@ function listenToPrintQueue() {
               printedAt: new Date().toISOString(),
               assignedMachine: printerTarget,
             });
+
+            // Clean up temporary downloaded PDF after spooling to keep shop PC storage tidy
+            setTimeout(() => {
+              fs.unlink(localPdfPath, () => {});
+            }, 60000);
 
             console.log(
               `✅ [JOB COMPLETED] #${orderId} marked READY FOR PICKUP (Code: ${orderData.pickupCode})\n`,

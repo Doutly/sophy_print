@@ -33,6 +33,7 @@ export type PrintJob = {
   createdAt?: string | undefined;
   pickupCode: string;
   sides?: ("single" | "double") | undefined;
+  duplexMode?: ("single" | "duplex-long" | "duplex-short") | undefined;
   paper?: ("A4" | "A3") | undefined;
   orientation?: ("portrait" | "landscape" | "auto") | undefined;
   pagesPerSheet?: (1 | 2 | 4) | undefined;
@@ -269,6 +270,111 @@ export async function createPrintOrder(
   printJobs = [newJob, ...printJobs];
 
   return newJob;
+}
+
+export interface QueueEstimate {
+  estimatedMinutesMin: number;
+  estimatedMinutesMax: number;
+  displayText: string;
+  positionInQueue: number;
+  activeJobsAhead: number;
+  sheetsAhead: number;
+  trafficLevel: "Light" | "Moderate" | "Busy" | "Peak";
+}
+
+/**
+ * Computes an accurate, real-time estimated wait time based on active queue traffic,
+ * machine print speeds (Canon 4545i III vs Epson), and queue position.
+ */
+export function calculateQueueWaitEstimate(
+  targetJob?: Partial<PrintJob>,
+  allJobs: PrintJob[] = [],
+): QueueEstimate {
+  if (targetJob?.status === "Ready") {
+    return {
+      estimatedMinutesMin: 0,
+      estimatedMinutesMax: 0,
+      displayText: "Ready for pickup now!",
+      positionInQueue: 0,
+      activeJobsAhead: 0,
+      sheetsAhead: 0,
+      trafficLevel: "Light",
+    };
+  }
+
+  const isColour = targetJob?.type === "Colour";
+  // Filter active jobs ahead in queue (Pending, Printing, or Waiting)
+  const activeJobs = allJobs.filter(
+    (j) => j.status === "Pending" || j.status === "Printing" || j.status === "Waiting",
+  );
+
+  // If specific job is provided, find jobs that were created before this one
+  let jobsAhead = activeJobs;
+  if (targetJob?.id) {
+    const targetCreatedAt = targetJob.createdAt || "";
+    jobsAhead = activeJobs.filter((j) => {
+      if (j.id === targetJob.id) return false;
+      if (j.status === "Printing") return true; // already on tray
+      if (!targetCreatedAt || !j.createdAt) return true;
+      return new Date(j.createdAt).getTime() <= new Date(targetCreatedAt).getTime();
+    });
+  }
+
+  // Filter to same machine queue (B&W LAN queue vs Colour queue)
+  const machineQueueAhead = jobsAhead.filter(
+    (j) => (j.type === "Colour") === isColour,
+  );
+
+  // Sum sheets ahead
+  const sheetsAhead = machineQueueAhead.reduce((sum, j) => {
+    const sheets = j.physicalSheets || (j.sides === "double" ? Math.ceil(j.pages / 2) : j.pages);
+    return sum + sheets * (j.copies || 1);
+  }, 0);
+
+  const thisJobSheets =
+    (targetJob?.physicalSheets || targetJob?.pages || 1) * (targetJob?.copies || 1);
+
+  // Canon 4545i prints 45 sheets/min (~1.3s/sheet); Epson Colour prints 10 sheets/min (~6s/sheet)
+  // Plus ~25s spooling/paper feed overhead per job
+  const secondsPerSheet = isColour ? 6 : 1.4;
+  const overheadPerJob = 25;
+
+  const totalSeconds =
+    (sheetsAhead + thisJobSheets) * secondsPerSheet + machineQueueAhead.length * overheadPerJob;
+  const totalMinutes = totalSeconds / 60;
+
+  let minWait = Math.max(1, Math.floor(totalMinutes));
+  let maxWait = Math.max(minWait + 1, Math.ceil(totalMinutes * 1.35));
+
+  if (targetJob?.status === "Printing") {
+    minWait = 1;
+    maxWait = 2;
+  }
+
+  const positionInQueue = machineQueueAhead.length + 1;
+  let trafficLevel: "Light" | "Moderate" | "Busy" | "Peak" = "Light";
+  if (machineQueueAhead.length >= 8 || sheetsAhead > 150) trafficLevel = "Peak";
+  else if (machineQueueAhead.length >= 4 || sheetsAhead > 60) trafficLevel = "Busy";
+  else if (machineQueueAhead.length >= 2 || sheetsAhead > 20) trafficLevel = "Moderate";
+
+  let displayText = `${minWait}–${maxWait} min`;
+  if (targetJob?.status === "Printing") {
+    displayText = "Printing now (~1–2 min)";
+  } else if (positionInQueue === 1) {
+    displayText = `Next up (~${minWait}–${maxWait} min)`;
+  } else {
+    displayText = `#${positionInQueue} in queue (${minWait}–${maxWait} min)`;
+  }
+
+  return {
+    estimatedMinutesMin: minWait,
+    estimatedMinutesMax: maxWait,
+    displayText,
+    positionInQueue,
+    activeJobsAhead: machineQueueAhead.length,
+    sheetsAhead,
+    trafficLevel,
+  };
 }
 
 export async function updateJobStatus(id: string, status: JobStatus): Promise<void> {

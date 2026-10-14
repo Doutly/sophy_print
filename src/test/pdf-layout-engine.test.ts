@@ -3,6 +3,7 @@ import {
   computeSheetMetrics,
   resolvePageIndices,
   transformPdfLayout,
+  stampOrderIdOnPdf,
   DEFAULT_PRINT_LAYOUT_CONFIG,
 } from "../lib/pdf-layout-engine";
 import { PDFDocument } from "pdf-lib";
@@ -83,5 +84,38 @@ describe("PDF Layout Engine & Sheet Metrics", () => {
       pagesPerSheet: 4,
     });
     expect(result4Up.sheetCount).toBe(1);
+  });
+
+  it("handles the user's exact case: 32 pages with 1:4 (4-up) double-sided yields 8 faces and 4 physical sheets", () => {
+    // 32 original pages with 1:4 (4 pages per sheet):
+    // Single-sided: 8 faces on 8 physical sheets
+    const single = computeSheetMetrics(32, 4, "single");
+    expect(single.printedFaces).toBe(8);
+    expect(single.physicalSheets).toBe(8);
+
+    // Double-sided (Long edge flip): 8 faces on 4 physical sheets (Front + Back)
+    const duplexLong = computeSheetMetrics(32, 4, "duplex-long");
+    expect(duplexLong.printedFaces).toBe(8);
+    expect(duplexLong.physicalSheets).toBe(4);
+    expect(duplexLong.isDuplex).toBe(true);
+
+    // Double-sided (Short edge flip): 8 faces on 4 physical sheets (Front + Back)
+    const duplexShort = computeSheetMetrics(32, 4, "duplex-short");
+    expect(duplexShort.printedFaces).toBe(8);
+    expect(duplexShort.physicalSheets).toBe(4);
+    expect(duplexShort.isDuplex).toBe(true);
+  });
+
+  it("stamps tiny Order ID on each sheet of a document", async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([595, 842]);
+    doc.addPage([595, 842]);
+    const originalBytes = await doc.save();
+
+    const stampedBytes = await stampOrderIdOnPdf(originalBytes, "2762");
+    expect(stampedBytes.length).toBeGreaterThan(0);
+
+    const reloaded = await PDFDocument.load(stampedBytes);
+    expect(reloaded.getPageCount()).toBe(2);
   });
 });

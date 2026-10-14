@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertCircle,
+  Bell,
+  BellRing,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -13,6 +15,7 @@ import {
   Minus,
   Plus,
   Printer,
+  Search,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -28,20 +31,22 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { detectPdfPageCount } from "@/lib/pdf-detector";
 import {
   calculateJobPrice,
+  calculateQueueWaitEstimate,
   createPrintOrder,
   defaultPricingConfig,
+  generateUniquePickupCode,
+  getStoredPrintJobs,
   loadPricingConfig,
   parsePageRange,
+  subscribeToOrders,
   validatePrintableFile,
   type PrintJob,
   type PricingConfig,
 } from "@/lib/print-data";
-import { TemplateGallery } from "@/components/template-gallery";
 import { DocumentEditorCanvas } from "@/components/document-editor-canvas";
-import type { CampusTemplate } from "@/lib/templates-data";
 import { getPendingTemplateDraft } from "@/lib/template-draft-store";
 import { PrintWizardModal } from "@/components/print-wizard/print-wizard-modal";
-import type { PrintLayoutConfig } from "@/lib/pdf-layout-engine";
+import { stampOrderIdOnPdf, type PrintLayoutConfig } from "@/lib/pdf-layout-engine";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -123,26 +128,35 @@ function StudentPrintFlow() {
     }
   }, []);
 
-  const handleTemplateSelected = (data: {
-    template: CampusTemplate;
-    file?: File;
-    generatedFileName: string;
-    pageCount?: number;
-  }) => {
-    setFileName(data.generatedFileName);
-    if (data.file) {
-      setUploadedFile(data.file);
-      data.file.arrayBuffer().then(setDocumentArrayBuffer).catch(() => {});
-    } else if (data.template?.originalDownloadUrl) {
-      setFallbackDownloadUrl(data.template.originalDownloadUrl);
-      fetch(data.template.originalDownloadUrl)
-        .then((r) => r.arrayBuffer())
-        .then(setDocumentArrayBuffer)
-        .catch(() => {});
+  const [allOrders, setAllOrders] = useState<PrintJob[]>(getStoredPrintJobs());
+  useEffect(() => {
+    const unsub = subscribeToOrders((orders) => {
+      setAllOrders(orders);
+    });
+    return () => unsub();
+  }, []);
+
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default",
+  );
+
+  const handleEnableNotifications = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      alert("Browser notifications are not supported on this device.");
+      return;
     }
-    setDetectedTotalPages(data.pageCount || 1);
-    setStep(2);
-    toast.success(`Template loaded: ${data.template.title}`);
+    try {
+      const perm = await Notification.requestPermission();
+      setNotificationPermission(perm);
+      if (perm === "granted") {
+        new Notification("🔔 Notifications Enabled!", {
+          body: "You will be notified immediately when your print is ready for pickup.",
+          icon: "/favicon.ico",
+        });
+      }
+    } catch (e) {
+      console.warn("Could not request notification permission:", e);
+    }
   };
 
   // Pricing — load from Firestore on mount, fall back to cached/default
@@ -217,14 +231,31 @@ function StudentPrintFlow() {
       let downloadUrl: string | undefined = fallbackDownloadUrl || undefined;
       let storagePath: string | undefined = undefined;
 
-      // Asynchronously upload real document to Firebase Storage
+      // 1. Generate unique 4-digit pickup code & order ID first
+      const orderId = await generateUniquePickupCode();
+
+      // 2. Stamp tiny order ID on every sheet of the PDF before uploading!
+      let fileToUpload = uploadedFile;
       if (uploadedFile) {
         try {
+          const rawBytes = await uploadedFile.arrayBuffer();
+          const stampedBytes = await stampOrderIdOnPdf(rawBytes, orderId);
+          fileToUpload = new File([stampedBytes], uploadedFile.name, {
+            type: "application/pdf",
+          });
+        } catch (stampErr) {
+          console.warn("Could not stamp order ID on PDF:", stampErr);
+        }
+      }
+
+      // 3. Asynchronously upload stamped document to Firebase Storage
+      if (fileToUpload) {
+        try {
           const timestamp = Date.now();
-          const cleanName = uploadedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const cleanName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, "_");
           storagePath = `orders/pending/${timestamp}_${cleanName}`;
           const storageReference = ref(storage, storagePath);
-          await uploadBytes(storageReference, uploadedFile);
+          await uploadBytes(storageReference, fileToUpload);
           downloadUrl = await getDownloadURL(storageReference);
         } catch (storageErr) {
           console.info("Firebase storage upload skipped/offline fallback:", storageErr);
@@ -232,8 +263,10 @@ function StudentPrintFlow() {
       }
 
       const job = await createPrintOrder({
+        id: orderId,
+        pickupCode: orderId,
         file: fileName || "Document.pdf",
-        fileSize: uploadedFile?.size,
+        fileSize: fileToUpload?.size || uploadedFile?.size,
         type: mode === "colour" ? "Colour" : "B&W",
         pages: activePages,
         totalPagesInDoc: detectedTotalPages,
@@ -244,6 +277,7 @@ function StudentPrintFlow() {
         student: studentName.trim() || "Anonymous",
         phone: studentPhone.trim() || undefined,
         sides,
+        duplexMode: sides === "double" ? "duplex-long" : "single",
         paper,
         printer: mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III" : "Epson L5290",
         downloadUrl,
@@ -285,16 +319,33 @@ function StudentPrintFlow() {
       let downloadUrl: string | undefined = undefined;
       let storagePath: string | undefined = undefined;
 
+      // 1. Generate unique 4-digit pickup code / order ID first
+      const orderId = await generateUniquePickupCode();
+
+      // 2. Stamp tiny order ID on every sheet of the transformed PDF
+      let fileToUpload = data.transformedFile;
+      try {
+        const rawBytes = await data.transformedFile.arrayBuffer();
+        const stampedBytes = await stampOrderIdOnPdf(rawBytes, orderId);
+        fileToUpload = new File([stampedBytes], data.transformedFile.name, {
+          type: "application/pdf",
+        });
+      } catch (stampErr) {
+        console.warn("Could not stamp order ID on wizard PDF:", stampErr);
+      }
+
       const timestamp = Date.now();
-      const cleanName = data.transformedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const cleanName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, "_");
       storagePath = `orders/pending/${timestamp}_${cleanName}`;
       const storageReference = ref(storage, storagePath);
-      await uploadBytes(storageReference, data.transformedFile);
+      await uploadBytes(storageReference, fileToUpload);
       downloadUrl = await getDownloadURL(storageReference);
 
       const job = await createPrintOrder({
-        file: data.transformedFile.name,
-        fileSize: data.transformedFile.size,
+        id: orderId,
+        pickupCode: orderId,
+        file: fileToUpload.name,
+        fileSize: fileToUpload.size,
         type: data.colorMode === "colour" ? "Colour" : "B&W",
         pages: data.selectedPages,
         totalPagesInDoc: detectedTotalPages,
@@ -308,6 +359,7 @@ function StudentPrintFlow() {
         student: data.studentName.trim() || studentName.trim() || "Anonymous",
         phone: data.studentPhone.trim() || studentPhone.trim() || undefined,
         sides: data.config.duplex === "single" ? "single" : "double",
+        duplexMode: data.config.duplex,
         paper: "A4",
         orientation: data.config.orientation,
         pagesPerSheet: data.config.pagesPerSheet,
@@ -323,7 +375,7 @@ function StudentPrintFlow() {
         setStep(4);
       }, 700);
     } catch (err: any) {
-      console.error("Order creation failed:", err);
+      console.error("Failed to complete order:", err);
       setPaying(false);
       setStep(4);
     }
@@ -345,20 +397,14 @@ function StudentPrintFlow() {
               Sophy <span className="text-primary font-bold">Print</span>
             </span>
           </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              to="/templates"
-              className="text-xs font-semibold text-primary transition-colors hover:opacity-80 flex items-center gap-1"
-            >
-              <Sparkles className="size-3.5" />
-              Template Gallery
-            </Link>
+          <div className="flex items-center gap-3">
             <Link
               to="/track"
               search={{ order: undefined }}
-              className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+              className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card/60 shadow-2xs hover:bg-card"
             >
-              Track an order
+              <Search className="size-3.5 text-primary" />
+              <span>Track an order</span>
             </Link>
           </div>
         </div>
@@ -432,112 +478,45 @@ function StudentPrintFlow() {
               </div>
             )}
 
-            {!fileName && (
-              <div className="mb-6 flex rounded-xl border border-border bg-muted/40 p-1">
-                <button
-                  type="button"
-                  onClick={() => setUploadMode("upload")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                    uploadMode === "upload"
-                      ? "bg-background text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  📁 Upload Document
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUploadMode("gallery")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                    uploadMode === "gallery"
-                      ? "bg-background text-primary shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Sparkles className="size-3.5" />
-                  Campus Template Gallery
-                  <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-600 font-extrabold uppercase">
-                    Editable
-                  </span>
-                </button>
-              </div>
-            )}
-
             {!fileName ? (
-              uploadMode === "gallery" ? (
-                <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
-                  <TemplateGallery
-                    onSelectTemplateForPrint={handleTemplateSelected}
-                    onSwitchToUpload={() => setUploadMode("upload")}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      acceptFile(event.dataTransfer.files[0]);
-                    }}
-                    className="group relative grid min-h-80 place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-all hover:border-primary/60 hover:bg-primary/[0.01] shadow-xs"
+              <div
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  acceptFile(event.dataTransfer.files[0]);
+                }}
+                className="group relative grid min-h-80 place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-all hover:border-primary/60 hover:bg-primary/[0.01] shadow-xs"
+              >
+                <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/40 opacity-0 group-hover:animate-scan group-hover:opacity-100" />
+                <div>
+                  <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary shadow-xs">
+                    <Upload className="size-7" />
+                  </span>
+                  <h2 className="mt-6 font-display text-xl font-bold text-foreground">
+                    Drop your document here
+                  </h2>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    PDF, Word (DOCX), or PowerPoint (PPTX)
+                  </p>
+                  <Button
+                    size="lg"
+                    className="mt-6 min-w-44 shadow-xs"
+                    onClick={() => inputRef.current?.click()}
                   >
-                    <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/40 opacity-0 group-hover:animate-scan group-hover:opacity-100" />
-                    <div>
-                      <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary shadow-xs">
-                        <Upload className="size-7" />
-                      </span>
-                      <h2 className="mt-6 font-display text-xl font-bold text-foreground">
-                        Drop your document here
-                      </h2>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        PDF, Word (DOCX), or PowerPoint (PPTX)
-                      </p>
-                      <Button
-                        size="lg"
-                        className="mt-6 min-w-44 shadow-xs"
-                        onClick={() => inputRef.current?.click()}
-                      >
-                        Choose Document
-                      </Button>
-                      <input
-                        ref={inputRef}
-                        type="file"
-                        accept=".pdf,.docx,.doc,.pptx,.ppt,application/pdf"
-                        className="hidden"
-                        onChange={(event) => acceptFile(event.target.files?.[0])}
-                      />
-                      <p className="mt-4 text-xs text-muted-foreground">
-                        Printable documents only · Up to 50 MB · Private & secure on campus
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-xs">
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary shrink-0">
-                        <Sparkles className="size-4" />
-                      </span>
-                      <div>
-                        <p className="text-xs font-semibold text-foreground">
-                          Need a Project Front Page or Lab Record Cover?
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Pick standard campus formats, customize with your credentials, and print
-                          in seconds.
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setUploadMode("gallery")}
-                      className="gap-1.5 text-xs font-semibold shrink-0"
-                    >
-                      Browse Templates
-                    </Button>
-                  </div>
-                </>
-              )
+                    Choose Document
+                  </Button>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept=".pdf,.docx,.doc,.pptx,.ppt,application/pdf"
+                    className="hidden"
+                    onChange={(event) => acceptFile(event.target.files?.[0])}
+                  />
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Printable documents only · Up to 50 MB · Private & secure on campus
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="rounded-xl border border-border bg-card p-6 shadow-xs">
                 <div className="flex items-start gap-4">
@@ -663,37 +642,25 @@ function StudentPrintFlow() {
 
         {/* STEP 2: CONFIGURE (Includes Page Range Selection) */}
         {step === 2 && (
-          <section className="animate-rise grid gap-6 lg:grid-cols-[1fr_260px]">
-            <div className="space-y-5">
-              {/* ACROBAT-STYLE 3-STAGE PRINT STUDIO HERO BANNER */}
-              <div className="rounded-2xl border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                      Acrobat Standard
-                    </span>
-                    <h3 className="font-display font-bold text-base text-foreground">
-                      Step-by-Step Print Customizer Studio
-                    </h3>
-                  </div>
-                  <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                    Configure Landscape/Portrait, 2-on-1 or 2x2 multi-page paper savings, duplex flip, and preview the exact physical print sheet before payment.
-                  </p>
-                </div>
-                <Button
-                  size="lg"
-                  onClick={async () => {
-                    if (!documentArrayBuffer && uploadedFile) {
-                      const b = await uploadedFile.arrayBuffer();
-                      setDocumentArrayBuffer(b);
-                    }
-                    setWizardOpen(true);
-                  }}
-                  className="gap-2 font-display font-bold text-xs bg-primary text-primary-foreground shadow-md hover:shadow-lg shrink-0 cursor-pointer"
-                >
-                  <Eye className="size-4" /> Open Print Studio & Preview
-                </Button>
-              </div>
+          <section className="animate-rise grid gap-6 lg:grid-cols-[1fr_280px] min-w-0">
+            <div className="space-y-5 min-w-0">
+              {/* SLEEK PRINT CUSTOMIZER STUDIO LAUNCHER */}
+              <Button
+                type="button"
+                size="lg"
+                onClick={async () => {
+                  if (!documentArrayBuffer && uploadedFile) {
+                    const b = await uploadedFile.arrayBuffer();
+                    setDocumentArrayBuffer(b);
+                  }
+                  setWizardOpen(true);
+                }}
+                className="w-full h-12 rounded-xl bg-gradient-to-r from-primary via-primary/95 to-primary text-primary-foreground font-display font-bold text-xs sm:text-sm shadow-md hover:shadow-lg hover:brightness-105 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer px-4"
+              >
+                <Sparkles className="size-4 animate-pulse shrink-0 text-primary-foreground/90" />
+                <span className="truncate">Customize Print & Live Preview (Orientation, 2-on-1, Sizing)</span>
+                <ChevronRight className="size-4 shrink-0 opacity-80" />
+              </Button>
 
               {/* PAGE RANGE SELECTION CARD */}
               <fieldset className="rounded-xl border border-border bg-card p-5 shadow-xs">
@@ -863,7 +830,7 @@ function StudentPrintFlow() {
             </div>
 
             {/* LIVE STICKY PRICE SUMMARY */}
-            <aside className="h-fit rounded-xl border border-primary/20 bg-primary/5 p-5 shadow-xs lg:sticky lg:top-24">
+            <aside className="h-fit rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5 shadow-xs lg:sticky lg:top-24 min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
                 Live price estimate
               </p>
@@ -872,37 +839,44 @@ function StudentPrintFlow() {
               </p>
               <p className="mt-1 text-xs text-muted-foreground">Zero hidden charges</p>
 
-              <div className="mt-4 space-y-2 border-t border-primary/20 pt-3 text-xs">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Routing machine</span>
-                  <span className="font-medium text-foreground">
-                    {mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}
+              <div className="mt-4 space-y-2.5 border-t border-primary/20 pt-3 text-xs">
+                <div className="flex items-start justify-between gap-2 text-muted-foreground">
+                  <span className="shrink-0">Routing machine</span>
+                  <span
+                    className="font-medium text-foreground text-right truncate max-w-[170px] sm:max-w-none text-[11px] sm:text-xs"
+                    title={mode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson L5290"}
+                  >
+                    {mode === "bw" ? "Canon iR-ADV 4545i" : "Epson L5290"}
                   </span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 text-muted-foreground">
                   <span>Selected pages</span>
                   <span className="font-medium text-foreground">{activePages} pages</span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 text-muted-foreground">
                   <span>Physical sheets</span>
-                  <span className="font-medium text-foreground">
+                  <span className="font-medium text-foreground font-mono">
                     {priceDetails.sheets} × {copies} = {priceDetails.sheets * copies}
                   </span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 text-muted-foreground">
                   <span>Rate per sheet</span>
-                  <span className="font-medium text-foreground">₹{priceDetails.unitRate}</span>
+                  <span className="font-medium text-foreground font-mono">₹{priceDetails.unitRate}</span>
                 </div>
               </div>
             </aside>
 
-            {/* Step navigation buttons */}
-            <div className="flex flex-wrap items-center justify-between gap-3 lg:col-span-2 pt-2">
-              <Button variant="ghost" onClick={() => setStep(1)} className="gap-1.5 cursor-pointer">
-                <ChevronLeft className="size-4" /> Back
+            {/* Step navigation buttons (Fully responsive on mobile) */}
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 lg:col-span-2 pt-4 border-t border-border mt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setStep(1)}
+                className="gap-1.5 cursor-pointer justify-center sm:justify-start w-full sm:w-auto h-10"
+              >
+                <ChevronLeft className="size-4" /> Back to Upload
               </Button>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
@@ -914,7 +888,7 @@ function StudentPrintFlow() {
                     }
                     setWizardOpen(true);
                   }}
-                  className="gap-2 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/5 cursor-pointer"
+                  className="gap-2 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/5 cursor-pointer justify-center w-full sm:w-auto h-11"
                 >
                   <Eye className="size-4" /> Layout & Live Preview
                 </Button>
@@ -923,7 +897,7 @@ function StudentPrintFlow() {
                   size="lg"
                   disabled={!parsedRange.isValid}
                   onClick={() => setStep(3)}
-                  className="gap-1.5 shadow-xs cursor-pointer font-semibold"
+                  className="gap-1.5 shadow-xs cursor-pointer font-semibold justify-center w-full sm:w-auto h-11 bg-primary text-primary-foreground"
                 >
                   Quick Review & Pay <ChevronRight className="size-4" />
                 </Button>
@@ -1055,10 +1029,27 @@ function StudentPrintFlow() {
             </p>
 
             <div className="mx-auto mt-8 max-w-sm rounded-xl border border-primary/20 bg-card p-6 text-left shadow-xs">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Estimated printing wait</span>
-                <span className="font-semibold text-foreground">5–8 min</span>
-              </div>
+              {(() => {
+                const step4Estimate = calculateQueueWaitEstimate(createdOrder || undefined, allOrders);
+                return (
+                  <>
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span>Estimated printing wait</span>
+                      <span className="font-semibold text-foreground font-mono">
+                        {step4Estimate.displayText}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex justify-between items-center text-[11px] text-muted-foreground">
+                      <span>Queue Position & Traffic</span>
+                      <span className="font-semibold text-primary">
+                        {step4Estimate.positionInQueue === 1
+                          ? "Next up in queue"
+                          : `Position #${step4Estimate.positionInQueue} (${step4Estimate.trafficLevel} traffic)`}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <div>
                   <span className="text-xs font-medium text-foreground">Pickup & Order Code</span>
@@ -1094,11 +1085,30 @@ function StudentPrintFlow() {
                       fallbackCopyText(code);
                     }
                   }}
-                  className="gap-1.5 text-xs h-8"
+                  className="gap-1.5 text-xs h-8 cursor-pointer"
                 >
                   <Copy className="size-3.5" /> Copy Code
                 </Button>
                 <span className="text-[11px] text-muted-foreground">Show at Xerox counter</span>
+              </div>
+
+              {/* Instant Browser Notification Button */}
+              <div className="mt-4 pt-3 border-t border-border">
+                {notificationPermission !== "granted" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleEnableNotifications}
+                    className="w-full gap-2 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/5 cursor-pointer h-9"
+                  >
+                    <Bell className="size-3.5" /> Notify me when ready
+                  </Button>
+                ) : (
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-600 font-medium bg-emerald-500/10 py-1.5 px-2 rounded-lg">
+                    <BellRing className="size-3.5 shrink-0" />
+                    <span>Browser notifications enabled for this order</span>
+                  </div>
+                )}
               </div>
             </div>
 

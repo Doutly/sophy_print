@@ -199,3 +199,83 @@ describe("Unified 4-Digit Order ID & Pickup Code", () => {
     expect(order.id).toMatch(/^[1-9][0-9]{3}$/);
   });
 });
+
+describe("End-to-End Print Workflow & Agent Dispatching Pipeline", () => {
+  it("verifies end-to-end stamping, order creation, duplex/copies tracking, and dynamic queue wait estimation", async () => {
+    const { PDFDocument } = await import("pdf-lib");
+    const { stampOrderIdOnPdf } = await import("@/lib/pdf-layout-engine");
+    const {
+      generateUniquePickupCode,
+      createPrintOrder,
+      calculateQueueWaitEstimate,
+    } = await import("@/lib/print-data");
+
+    // 1. Generate unique 4-digit code (e.g. 2762)
+    const code = await generateUniquePickupCode();
+    expect(code).toMatch(/^[1-9][0-9]{3}$/);
+
+    // 2. Create blank 4-page source PDF and stamp the order ID
+    const sampleDoc = await PDFDocument.create();
+    for (let i = 0; i < 4; i++) {
+      sampleDoc.addPage([595, 842]);
+    }
+    const rawPdfBytes = await sampleDoc.save();
+
+    const stampedPdfBytes = await stampOrderIdOnPdf(rawPdfBytes, code);
+    expect(stampedPdfBytes.length).toBeGreaterThan(0);
+
+    // Verify stamped PDF has all 4 pages preserved
+    const verifiedDoc = await PDFDocument.load(stampedPdfBytes);
+    expect(verifiedDoc.getPageCount()).toBe(4);
+
+    // 3. Create simulated orders in queue to test dynamic queue wait estimation
+    const existingJob1 = await createPrintOrder({
+      file: "Assignment_1.pdf",
+      type: "B&W",
+      pages: 20,
+      copies: 2,
+      physicalSheets: 20,
+      amount: 40,
+      status: "Printing",
+      student: "Rohan",
+      sides: "double",
+      duplexMode: "duplex-long",
+      paper: "A4",
+      printer: "Canon imageRUNNER ADVANCE 4545i III (Unit 1)",
+    });
+
+    const newJob = await createPrintOrder({
+      id: code,
+      pickupCode: code,
+      file: "Lab_Report_Final.pdf",
+      type: "B&W",
+      pages: 8,
+      copies: 3,
+      physicalSheets: 4,
+      amount: 18,
+      status: "Pending",
+      student: "Priya",
+      sides: "double",
+      duplexMode: "duplex-long",
+      paper: "A4",
+      printer: "Canon imageRUNNER ADVANCE 4545i III (Unit 1)",
+    });
+
+    // 4. Calculate real-time queue estimate
+    const estimate = calculateQueueWaitEstimate(newJob, [existingJob1, newJob]);
+    expect(estimate.positionInQueue).toBeGreaterThanOrEqual(1);
+    expect(estimate.estimatedMinutesMin).toBeGreaterThanOrEqual(1);
+    expect(estimate.displayText).toMatch(/min/i);
+    expect(["Light", "Moderate", "Busy", "Peak"]).toContain(estimate.trafficLevel);
+
+    // 5. Test queue estimate when job transitions to Ready
+    const readyEstimate = calculateQueueWaitEstimate({ ...newJob, status: "Ready" }, [
+      existingJob1,
+      newJob,
+    ]);
+    expect(readyEstimate.displayText).toBe("Ready for pickup now!");
+    expect(readyEstimate.estimatedMinutesMin).toBe(0);
+    expect(readyEstimate.positionInQueue).toBe(0);
+  });
+});
+

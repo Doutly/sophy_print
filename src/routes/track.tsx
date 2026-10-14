@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  Bell,
+  BellRing,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -8,16 +10,20 @@ import {
   PackageCheck,
   Printer,
   Search,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  calculateQueueWaitEstimate,
   fetchOrderById,
   getStoredPrintJobs,
   subscribeToOrderById,
+  subscribeToOrders,
   type PrintJob,
+  type QueueEstimate,
 } from "@/lib/print-data";
 
 export const Route = createFileRoute("/track")({
@@ -51,7 +57,21 @@ function TrackPage() {
   const [shown, setShown] = useState(Boolean(search.order));
   const [matchedJob, setMatchedJob] = useState<PrintJob | null>(null);
   const [searching, setSearching] = useState(false);
+  const [allJobs, setAllJobs] = useState<PrintJob[]>(getStoredPrintJobs());
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default",
+  );
+  const hasNotifiedRef = useRef<Record<string, boolean>>({});
 
+  // Subscribe to live queue of all active jobs for traffic estimation
+  useEffect(() => {
+    const unsub = subscribeToOrders((jobs) => {
+      setAllJobs(jobs);
+    });
+    return () => unsub();
+  }, []);
+
+  // Subscribe to this specific order's real-time status
   useEffect(() => {
     if (!activeOrderId.trim()) {
       setMatchedJob(null);
@@ -73,6 +93,49 @@ function TrackPage() {
     }
   }, [search.order]);
 
+  // Request browser notification permission
+  const handleEnableNotifications = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      alert("Browser notifications are not supported on this device.");
+      return;
+    }
+
+    try {
+      const perm = await Notification.requestPermission();
+      setNotificationPermission(perm);
+      if (perm === "granted") {
+        new Notification("🔔 Notifications Enabled!", {
+          body: "We will alert you the moment your print is completed and ready at the counter.",
+          icon: "/favicon.ico",
+        });
+      }
+    } catch (e) {
+      console.warn("Could not request notification permission:", e);
+    }
+  };
+
+  // Trigger notification when job status becomes Ready
+  useEffect(() => {
+    if (!matchedJob) return;
+    const isReadyStatus = matchedJob.status === "Ready" || matchedJob.status === "Completed";
+    if (
+      isReadyStatus &&
+      notificationPermission === "granted" &&
+      !hasNotifiedRef.current[matchedJob.id]
+    ) {
+      hasNotifiedRef.current[matchedJob.id] = true;
+      try {
+        new Notification("🎉 Your Print is Ready for Pickup!", {
+          body: `Order #${matchedJob.id} (${matchedJob.file}) is ready at the campus counter. Pickup Code: #${matchedJob.pickupCode}`,
+          icon: "/favicon.ico",
+          tag: `print-ready-${matchedJob.id}`,
+        });
+      } catch (err) {
+        console.warn("Notification error:", err);
+      }
+    }
+  }, [matchedJob?.status, matchedJob?.id, notificationPermission]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
@@ -84,6 +147,9 @@ function TrackPage() {
   const isReady = matchedJob?.status === "Ready" || matchedJob?.status === "Completed";
   const isPrinting = matchedJob?.status === "Printing" || isReady;
   const isAcknowledged = matchedJob?.status !== "Pending";
+
+  // Dynamic traffic estimation
+  const queueEstimate = calculateQueueWaitEstimate(matchedJob || undefined, allJobs);
 
   const timelineSteps: TimelineItem[] = matchedJob
     ? [
@@ -109,13 +175,15 @@ function TrackPage() {
             ? "Finished printing"
             : matchedJob.status === "Printing"
               ? "Document printing on machine tray"
-              : "In print queue",
+              : `Position #${queueEstimate.positionInQueue} in queue (${queueEstimate.trafficLevel} traffic)`,
           active: isPrinting,
         },
         {
           icon: PackageCheck,
           label: isReady ? "Ready for pickup!" : "Pickup counter",
-          detail: isReady ? "Collect document now" : "Estimated wait 5–8 min",
+          detail: isReady
+            ? "Collect document now at counter"
+            : `Estimated wait: ${queueEstimate.displayText}`,
           active: isReady,
         },
       ]
@@ -236,7 +304,9 @@ function TrackPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {isReady
                             ? "Ready for immediate collection"
-                            : "Printing in progress on shop printer"}
+                            : matchedJob.status === "Printing"
+                              ? "Printing now on machine tray"
+                              : `Queued · Estimated wait ${queueEstimate.displayText}`}
                         </p>
                       </div>
                     </div>
@@ -244,11 +314,71 @@ function TrackPage() {
                       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
                         Pickup Code
                       </p>
-                      <p className="font-display text-2xl font-bold tracking-widest text-primary">
+                      <p className="font-display text-2xl font-bold tracking-widest text-primary font-mono">
                         {matchedJob.pickupCode}
                       </p>
                     </div>
                   </div>
+
+                  {/* Real-Time Queue & Traffic Insights */}
+                  {!isReady && (
+                    <div className="mt-3.5 rounded-xl border border-border bg-secondary/30 p-3.5 text-xs space-y-2">
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="size-3.5 text-primary" /> Machine Queue Status:
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {queueEstimate.positionInQueue === 1
+                            ? "Currently printing / Next up"
+                            : `Position #${queueEstimate.positionInQueue} in queue`}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>Campus Xerox Traffic:</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            queueEstimate.trafficLevel === "Light"
+                              ? "bg-emerald-500/10 text-emerald-600"
+                              : queueEstimate.trafficLevel === "Moderate"
+                                ? "bg-amber-500/10 text-amber-600"
+                                : "bg-red-500/10 text-red-600"
+                          }`}
+                        >
+                          {queueEstimate.trafficLevel} Traffic ({queueEstimate.activeJobsAhead} orders ahead)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Native Browser Notification Button */}
+                  <div className="mt-4 pt-4 border-t border-border">
+                    {notificationPermission !== "granted" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleEnableNotifications}
+                        className="w-full gap-2 text-xs font-semibold text-primary border-primary/30 hover:bg-primary/5 cursor-pointer h-9"
+                      >
+                        <Bell className="size-4" /> Enable Browser Notification When Ready
+                      </Button>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-500/10 py-2 px-3 rounded-lg border border-emerald-500/20">
+                        <BellRing className="size-4 shrink-0 text-emerald-600" />
+                        <span>Browser notifications active — you will receive an alert the second it's printed!</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {isReady && (
+                    <div className="mt-5 pt-4 border-t border-border flex justify-center">
+                      <Button asChild size="default" className="w-full gap-2 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                        <Link to="/">
+                          <Check className="size-4" />
+                          Done / Start New Print
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </section>
             ) : (

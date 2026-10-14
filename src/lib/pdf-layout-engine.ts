@@ -21,6 +21,7 @@ export interface PrintLayoutConfig {
   autoCenter?: boolean;
   autoRotate?: boolean;
   printContentMode?: "document" | "with-notes";
+  orderIdStamp?: string;
 }
 
 export const DEFAULT_PRINT_LAYOUT_CONFIG: PrintLayoutConfig = {
@@ -298,6 +299,16 @@ export async function transformPdfLayout(
         });
       }
     }
+
+    if (config.orderIdStamp) {
+      sheet.drawText(`Order #${config.orderIdStamp.replace(/^#/, "")}`, {
+        x: Math.max(15, targetSheetWidth - 85),
+        y: 8,
+        size: 6.5,
+        color: rgb(0.4, 0.4, 0.4),
+        opacity: 0.85,
+      });
+    }
   }
 
   const transformedBytes = await targetDoc.save();
@@ -310,4 +321,30 @@ export async function transformPdfLayout(
     sheetCount: targetDoc.getPageCount(),
     outputFileName,
   };
+}
+
+/**
+ * Stamps a subtle, tiny Order ID on each page of a PDF document
+ * so students and shop staff can easily identify their physical printouts.
+ */
+export async function stampOrderIdOnPdf(
+  sourceBytes: ArrayBuffer | Uint8Array,
+  orderId: string,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.load(sourceBytes, { ignoreEncryption: true });
+  const pages = doc.getPages();
+  const cleanId = String(orderId).replace(/[^a-zA-Z0-9]/g, "");
+
+  for (const page of pages) {
+    const { width } = page.getSize();
+    page.drawText(`Order #${cleanId}`, {
+      x: Math.max(15, width - 85),
+      y: 8,
+      size: 6.5,
+      color: rgb(0.4, 0.4, 0.4),
+      opacity: 0.85,
+    });
+  }
+
+  return await doc.save();
 }

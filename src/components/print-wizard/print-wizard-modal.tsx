@@ -192,61 +192,72 @@ export function PrintWizardModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
-      <div className="relative flex flex-col w-full max-w-5xl max-h-[95vh] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-0 sm:p-4 overflow-y-auto">
+      <div className="relative flex flex-col w-full max-w-5xl h-[100dvh] sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-2xl border-0 sm:border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
         {/* Top Header & Wizard Stepper */}
-        <header className="border-b border-border bg-muted/40 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-              <Printer className="size-5" />
+        <header className="border-b border-border bg-muted/40 px-3.5 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <span className="grid size-9 sm:size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-xs shrink-0">
+              <Printer className="size-4 sm:size-5" />
             </span>
-            <div>
-              <h2 className="font-display font-bold text-base sm:text-lg text-foreground flex items-center gap-2">
+            <div className="min-w-0">
+              <h2 className="font-display font-bold text-sm sm:text-base text-foreground flex items-center gap-1.5 sm:gap-2 truncate">
                 Print Customizer Studio
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 uppercase">
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-600 uppercase">
                   Acrobat Standard
                 </span>
               </h2>
-              <p className="text-xs text-muted-foreground truncate max-w-sm sm:max-w-md">
+              <p className="text-[11px] sm:text-xs text-muted-foreground truncate max-w-xs sm:max-w-md">
                 {fileName} ({totalPages} pages)
               </p>
             </div>
           </div>
 
-          {/* Stepper Indicator */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {[
-              { num: 1, label: "Color & Pages", icon: Palette },
-              { num: 2, label: "Layout & Sizing", icon: Sliders },
-              { num: 3, label: "Preview & Pay", icon: Eye },
-            ].map((step, idx) => {
-              const Icon = step.icon;
-              const isActive = currentStage === step.num;
-              const isPast = currentStage > step.num;
+          {/* Stepper Indicator - Clickable navigation */}
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2.5 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {[
+                { num: 1, label: "Color & Pages", icon: Palette },
+                { num: 2, label: "Layout & Sizing", icon: Sliders },
+                { num: 3, label: "Preview & Pay", icon: Eye },
+              ].map((step, idx) => {
+                const Icon = step.icon;
+                const isActive = currentStage === step.num;
+                const isPast = currentStage > step.num;
+                const canNavigate = step.num <= currentStage || (step.num === 2 && currentStage === 3) || (step.num === 1);
 
-              return (
-                <div key={step.num} className="flex items-center gap-2">
-                  <div
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                      isActive
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : isPast
-                          ? "bg-emerald-500/10 text-emerald-600"
-                          : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {isPast ? <Check className="size-3.5" /> : <Icon className="size-3.5" />}
-                    <span className="hidden md:inline">{step.label}</span>
-                    <span className="md:hidden">Step {step.num}</span>
+                return (
+                  <div key={step.num} className="flex items-center gap-1 sm:gap-2">
+                    <button
+                      type="button"
+                      disabled={!canNavigate}
+                      onClick={() => {
+                        if (canNavigate) {
+                          setCurrentStage(step.num as 1 | 2 | 3);
+                        }
+                      }}
+                      className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : isPast
+                            ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 cursor-pointer"
+                            : "bg-muted text-muted-foreground opacity-60"
+                      } ${canNavigate ? "cursor-pointer" : "cursor-default"}`}
+                      title={`Go to ${step.label}`}
+                    >
+                      {isPast ? <Check className="size-3 sm:size-3.5" /> : <Icon className="size-3 sm:size-3.5" />}
+                      <span className="hidden md:inline">{step.label}</span>
+                      <span className="md:hidden">Step {step.num}</span>
+                    </button>
+                    {idx < 2 && <ChevronRight className="size-3 sm:size-3.5 text-muted-foreground/50 shrink-0" />}
                   </div>
-                  {idx < 2 && <ChevronRight className="size-3.5 text-muted-foreground/60" />}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer ml-1"
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer shrink-0 ml-1"
               aria-label="Close dialog"
             >
               <X className="size-5" />
@@ -313,6 +324,7 @@ export function PrintWizardModal({
               onChangeStudentPhone={setStudentPhone}
               isSubmitting={submitting}
               onConfirmAndPay={handleFinalSubmit}
+              onBackToLayout={() => setCurrentStage(2)}
             />
           )}
         </div>
