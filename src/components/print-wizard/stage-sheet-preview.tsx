@@ -68,7 +68,10 @@ export function StageSheetPreview({
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  // Render sheet preview on canvas via pdfjs-dist
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const renderTaskRef = useRef<any>(null);
+
+  // 1. Load the PDF Document once whenever transformedPdfBytes changes
   useEffect(() => {
     if (!transformedPdfBytes || transformedPdfBytes.length === 0) return;
 
@@ -76,20 +79,63 @@ export function StageSheetPreview({
     setLoadingPreview(true);
     setPreviewError(null);
 
+    // ALWAYS create a clone of the byte array so that pdf.js worker never detaches the original
+    const byteClone = new Uint8Array(transformedPdfBytes.slice());
+
+    const loadingTask = pdfjsLib.getDocument({
+      data: byteClone,
+      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/",
+      cMapPacked: true,
+    });
+
+    loadingTask.promise
+      .then((loadedDoc) => {
+        if (isCancelled) {
+          try {
+            loadedDoc.destroy();
+          } catch {}
+          return;
+        }
+        setPdfDoc(loadedDoc);
+        setTotalSheets(loadedDoc.numPages);
+        setCurrentSheet(1);
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.error("Failed to parse transformed PDF:", err);
+          setPreviewError("Could not load sheet preview: " + (err.message || String(err)));
+          setLoadingPreview(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+      try {
+        loadingTask.destroy();
+      } catch {}
+    };
+  }, [transformedPdfBytes]);
+
+  // 2. Render sheet on canvas whenever pdfDoc, currentSheet, or zoom changes
+  useEffect(() => {
+    if (!pdfDoc) return;
+
+    let isCancelled = false;
+    setLoadingPreview(true);
+    setPreviewError(null);
+
     async function renderPage() {
       try {
-        const loadingTask = pdfjsLib.getDocument({
-          data: transformedPdfBytes!,
-          cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/",
-          cMapPacked: true,
-        });
+        // Cancel any pending render task to avoid multiple simultaneous renders on the same canvas
+        if (renderTaskRef.current) {
+          try {
+            renderTaskRef.current.cancel();
+          } catch {}
+          renderTaskRef.current = null;
+        }
 
-        const pdf = await loadingTask.promise;
-        if (isCancelled) return;
-
-        setTotalSheets(pdf.numPages);
-        const safePageNum = Math.min(Math.max(1, currentSheet), pdf.numPages);
-        const page = await pdf.getPage(safePageNum);
+        const safePageNum = Math.min(Math.max(1, currentSheet), pdfDoc.numPages);
+        const page = await pdfDoc.getPage(safePageNum);
         if (isCancelled) return;
 
         const viewport = page.getViewport({ scale: 1.2 * zoom });
@@ -108,14 +154,20 @@ export function StageSheetPreview({
           canvas: canvas,
         };
 
-        await page.render(renderContext as any).promise;
+        const renderTask = page.render(renderContext as any);
+        renderTaskRef.current = renderTask;
+
+        await renderTask.promise;
         if (!isCancelled) {
           setLoadingPreview(false);
         }
       } catch (err: any) {
+        if (err?.name === "RenderingCancelledException") {
+          return;
+        }
         if (!isCancelled) {
           console.error("Failed to render PDF preview canvas:", err);
-          setPreviewError("Could not render sheet preview: " + err.message);
+          setPreviewError("Could not render sheet preview: " + (err.message || String(err)));
           setLoadingPreview(false);
         }
       }
@@ -125,8 +177,14 @@ export function StageSheetPreview({
 
     return () => {
       isCancelled = true;
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch {}
+        renderTaskRef.current = null;
+      }
     };
-  }, [transformedPdfBytes, currentSheet, zoom]);
+  }, [pdfDoc, currentSheet, zoom]);
 
   const machineName =
     colorMode === "bw" ? "Canon imageRUNNER ADVANCE 4545i III (LAN)" : "Epson EcoTank L5290 (Colour)";

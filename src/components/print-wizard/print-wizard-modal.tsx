@@ -146,7 +146,8 @@ export function PrintWizardModal({
     setTransforming(true);
 
     try {
-      const result = await transformPdfLayout(sourceArrayBuffer, currentLayoutConfig, fileName);
+      const bufferCopy = sourceArrayBuffer.slice(0);
+      const result = await transformPdfLayout(bufferCopy, currentLayoutConfig, fileName);
       setTransformedBytes(result.transformedBytes);
       setCurrentStage(3);
     } catch (err: any) {
@@ -163,8 +164,9 @@ export function PrintWizardModal({
     setSubmitting(true);
 
     try {
+      const bytesCopy = new Uint8Array(transformedBytes.slice());
       const transformedFile = new File(
-        [transformedBytes as Uint8Array<ArrayBuffer>],
+        [bytesCopy as Uint8Array<ArrayBuffer>],
         `${fileName.replace(/\.pdf$/i, "")}_spool.pdf`,
         { type: "application/pdf" },
       );
