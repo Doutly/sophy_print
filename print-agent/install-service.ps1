@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
 Installs Doutly Print Agent as a silent 24/7 Windows background startup service.
-Run in PowerShell as Administrator.
+If run as Administrator, registers a Windows Scheduled Task.
+If run as standard user, automatically falls back to the Windows Startup folder.
 #>
 
 $AgentFolder = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -23,16 +24,33 @@ $TriggerLogon = New-ScheduledTaskTrigger -AtLogOn
 $Principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Days 3650)
 
+$Registered = $false
+
 try {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger @($TriggerBoot, $TriggerLogon) -Principal $Principal -Settings $Settings | Out-Null
-    Write-Host "✅ Doutly Print Gateway successfully registered as a 24/7 Windows background startup service!" -ForegroundColor Green
-    Write-Host "   The agent will run silently in the background whenever this computer turns on." -ForegroundColor Cyan
-    Write-Host "   Zero CMD windows will remain open." -ForegroundColor Cyan
-    
-    # Start it right now
+    Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger @($TriggerBoot, $TriggerLogon) -Principal $Principal -Settings $Settings -ErrorAction Stop | Out-Null
+    $Registered = $true
+    Write-Host "✅ Doutly Print Gateway successfully registered as a 24/7 Windows Scheduled Task!" -ForegroundColor Green
     Start-ScheduledTask -TaskName $TaskName
     Write-Host "🚀 Background service launched successfully." -ForegroundColor Green
 } catch {
-    Write-Host "❌ Failed to register task: $_" -ForegroundColor Red
+    Write-Host "⚠️ Administrator rights not present for Task Scheduler ($($_.Exception.Message))." -ForegroundColor Yellow
+    Write-Host "   Installing automatic background startup into Windows User Startup Folder..." -ForegroundColor Cyan
+
+    $StartupFolder = [Environment]::GetFolderPath('Startup')
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut("$StartupFolder\DoutlyPrintGateway.lnk")
+    $Shortcut.TargetPath = $WscriptExe
+    $Shortcut.Arguments = "`"$VbsScript`""
+    $Shortcut.WorkingDirectory = $AgentFolder
+    $Shortcut.Description = "Doutly Print Gateway 24/7 Background Service"
+    $Shortcut.Save()
+
+    Write-Host "✅ Doutly Print Gateway registered in Windows Startup Folder:" -ForegroundColor Green
+    Write-Host "   $StartupFolder\DoutlyPrintGateway.lnk" -ForegroundColor Green
+    Write-Host "   The agent will now launch silently on every Windows login without needing Admin rights." -ForegroundColor Cyan
+
+    # Launch it now
+    Start-Process -FilePath $WscriptExe -ArgumentList "`"$VbsScript`"" -WorkingDirectory $AgentFolder
+    Write-Host "🚀 Background service launched successfully." -ForegroundColor Green
 }

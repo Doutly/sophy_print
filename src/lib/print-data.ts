@@ -141,7 +141,13 @@ export function subscribeToOrders(callback: (jobs: PrintJob[]) => void): () => v
       (snapshot) => {
         const liveJobs: PrintJob[] = [];
         snapshot.forEach((docSnap) => {
-          liveJobs.push(docSnap.data() as PrintJob);
+          const data = docSnap.data();
+          const cleanDocId = docSnap.id.replace("#", "").trim();
+          liveJobs.push({
+            ...data,
+            id: data.id ? data.id.toString().replace("#", "").trim() : cleanDocId,
+            pickupCode: data.pickupCode ? data.pickupCode.toString().replace("#", "").trim() : cleanDocId,
+          } as PrintJob);
         });
 
         // Sort descending by timestamp or placed
@@ -176,7 +182,13 @@ export async function fetchFirestoreOrders(): Promise<PrintJob[]> {
     const snapshot = await getDocs(ordersCol);
     const liveJobs: PrintJob[] = [];
     snapshot.forEach((docSnap) => {
-      liveJobs.push(docSnap.data() as PrintJob);
+      const data = docSnap.data();
+      const cleanDocId = docSnap.id.replace("#", "").trim();
+      liveJobs.push({
+        ...data,
+        id: data.id ? data.id.toString().replace("#", "").trim() : cleanDocId,
+        pickupCode: data.pickupCode ? data.pickupCode.toString().replace("#", "").trim() : cleanDocId,
+      } as PrintJob);
     });
 
     liveJobs.sort((a, b) => {
@@ -378,14 +390,25 @@ export function calculateQueueWaitEstimate(
 }
 
 export async function updateJobStatus(id: string, status: JobStatus): Promise<void> {
+  const cleanId = (id || "").toString().replace("#", "").trim();
+  if (!cleanId) {
+    throw new Error("Cannot update order: missing valid order ID");
+  }
+
   const currentJobs = getStoredPrintJobs();
-  const updated = currentJobs.map((j) => (j.id === id ? { ...j, status } : j));
+  const updated = currentJobs.map((j) =>
+    (j.id || "").toString().replace("#", "").trim() === cleanId ? { ...j, status } : j
+  );
   saveStoredPrintJobs(updated);
 
   try {
-    await updateDoc(doc(db, "orders", id), { status });
-  } catch {
-    // offline fallback
+    await updateDoc(doc(db, "orders", cleanId), {
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(`Failed to update status for order #${cleanId} in Firestore:`, err);
+    throw err;
   }
 }
 

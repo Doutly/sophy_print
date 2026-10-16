@@ -50,4 +50,39 @@ describe("Doutly Print Agent Windows Installer (.bat)", () => {
     // Ensure no unescaped (LTS version) inside if block
     expect(content).not.toContain("(LTS version)");
   });
+
+  it("simulates batch file block extraction and confirms config.json parses with zero syntax errors", () => {
+    const batContent = generateAgentInstallerBat();
+
+    // Simulate the PowerShell extraction regex on the generated .bat
+    const match = batContent.match(/::BEGIN_CONFIG_JSON::\r?\n([\s\S]*?)\r?\n::END_CONFIG_JSON::/);
+    expect(match).not.toBeNull();
+    const extractedConfigStr = match![1];
+
+    // Ensure it parses cleanly with JSON.parse
+    const parsed = JSON.parse(extractedConfigStr);
+    expect(parsed.gatewayId).toBe("SHOP-PC-01");
+    expect(parsed.printers.bw).toBe("Canon 01");
+    expect(parsed.printers.colour).toBe("EPSON L5290 Series");
+
+    // Verify UTF-8 No-BOM instruction in the batch file extractor
+    expect(batContent).toContain("System.Text.UTF8Encoding($false)");
+  });
+
+  it("verifies extracted agent.js contains industrial safeguards (atomic claiming, PDF magic bytes, Sumatra engine)", () => {
+    const batContent = generateAgentInstallerBat();
+    const match = batContent.match(/::BEGIN_AGENT_JS::\r?\n([\s\S]*?)\r?\n::END_AGENT_JS::/);
+    expect(match).not.toBeNull();
+    const extractedAgentJs = match![1];
+
+    // 1. Atomic Firestore claiming via transaction
+    expect(extractedAgentJs).toContain("runTransaction");
+    // 2. PDF magic bytes signature check
+    expect(extractedAgentJs).toContain("%PDF-");
+    // 3. SumatraPDF silent CLI engine integration
+    expect(extractedAgentJs).toContain("SumatraPDF.exe");
+    // 4. BOM stripping on config load
+    expect(extractedAgentJs).toContain("0xfeff");
+  });
 });
+

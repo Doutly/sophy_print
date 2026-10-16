@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Check,
   CheckCircle2,
+  Loader2,
   MoreHorizontal,
   Pause,
   Play,
@@ -10,6 +11,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,7 @@ function QueuePage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobs, setJobs] = useState<PrintJob[]>(getStoredPrintJobs());
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToOrders((liveJobs) => {
@@ -48,7 +51,15 @@ function QueuePage() {
   }, []);
 
   const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
-    await updateJobStatus(jobId, newStatus);
+    try {
+      setUpdatingId(jobId);
+      await updateJobStatus(jobId, newStatus);
+      toast.success(`Order #${jobId} updated to "${newStatus}" in Firestore.`);
+    } catch (err: any) {
+      toast.error(`Could not update order #${jobId}: ${err?.message || "Check network/permissions"}`);
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const filteredJobs = jobs.filter((job) => {
@@ -157,55 +168,63 @@ function QueuePage() {
                     <StatusBadge status={job.status} />
                   </div>
                   <div className="flex items-center justify-end gap-1.5">
-                    {job.status === "Pending" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[11px] px-2 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
-                        onClick={() => handleStatusChange(job.id, "Waiting")}
-                      >
-                        Acknowledge
-                      </Button>
-                    )}
-                    {job.status === "Waiting" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[11px] px-2"
-                        onClick={() => handleStatusChange(job.id, "Printing")}
-                      >
-                        Print
-                      </Button>
-                    )}
-                    {job.status === "Printing" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[11px] px-2 text-primary border-primary/30"
-                        onClick={() => handleStatusChange(job.id, "Ready")}
-                      >
-                        Ready
-                      </Button>
-                    )}
-                    {job.status === "Ready" && (
-                      <Button
-                        size="sm"
-                        className="h-7 text-[11px] px-2 shadow-xs"
-                        onClick={() => handleStatusChange(job.id, "Completed")}
-                      >
-                        Collected
-                      </Button>
-                    )}
-                    {job.status === "Failed" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        title="Retry"
-                        onClick={() => handleStatusChange(job.id, "Waiting")}
-                      >
-                        <RotateCcw className="size-3.5" />
-                      </Button>
+                    {updatingId === job.id ? (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Loader2 className="size-3.5 animate-spin text-primary" /> Updating...
+                      </span>
+                    ) : (
+                      <>
+                        {job.status === "Pending" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[11px] px-2 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
+                            onClick={() => handleStatusChange(job.id, "Waiting")}
+                          >
+                            Acknowledge
+                          </Button>
+                        )}
+                        {job.status === "Waiting" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[11px] px-2"
+                            onClick={() => handleStatusChange(job.id, "Printing")}
+                          >
+                            Print
+                          </Button>
+                        )}
+                        {job.status === "Printing" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[11px] px-2 text-primary border-primary/30"
+                            onClick={() => handleStatusChange(job.id, "Ready")}
+                          >
+                            Ready
+                          </Button>
+                        )}
+                        {job.status === "Ready" && (
+                          <Button
+                            size="sm"
+                            className="h-7 text-[11px] px-2 shadow-xs"
+                            onClick={() => handleStatusChange(job.id, "Completed")}
+                          >
+                            Collected
+                          </Button>
+                        )}
+                        {job.status === "Failed" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            title="Retry"
+                            onClick={() => handleStatusChange(job.id, "Waiting")}
+                          >
+                            <RotateCcw className="size-3.5" />
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

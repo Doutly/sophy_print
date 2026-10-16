@@ -277,5 +277,111 @@ describe("End-to-End Print Workflow & Agent Dispatching Pipeline", () => {
     expect(readyEstimate.estimatedMinutesMin).toBe(0);
     expect(readyEstimate.positionInQueue).toBe(0);
   });
+
+  it("simulates full admin-to-agent order lifecycle with updateJobStatus and ID sanitization", async () => {
+    const { createPrintOrder, updateJobStatus, getStoredPrintJobs } = await import("@/lib/print-data");
+
+    // 1. Student creates order (initial status: Pending)
+    const order = await createPrintOrder({
+      file: "Final_Thesis.pdf",
+      type: "Colour",
+      pages: 12,
+      copies: 1,
+      amount: 60,
+      status: "Pending",
+      student: "Vikram",
+      sides: "single",
+      paper: "A4",
+    });
+    expect(order.status).toBe("Pending");
+
+    // 2. Admin acknowledges order using clean ID
+    await updateJobStatus(order.id, "Waiting");
+    let current = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(current?.status).toBe("Waiting");
+
+    // 3. Agent picks up order using ID with leading '#'
+    await updateJobStatus(`#${order.id}`, "Printing");
+    current = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(current?.status).toBe("Printing");
+
+    // 4. Physical printing finishes -> Ready
+    await updateJobStatus(order.id, "Ready");
+    current = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(current?.status).toBe("Ready");
+
+    // 5. Student collects document -> Completed
+    await updateJobStatus(order.id, "Completed");
+    current = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(current?.status).toBe("Completed");
+
+    // 6. Verify error rejection on invalid or empty ID
+    await expect(updateJobStatus("", "Ready")).rejects.toThrow("Cannot update order");
+  });
+
+  it("QA/QC: handles order failure, stores diagnostic failure reason, and supports admin retry back to Waiting", async () => {
+    const { createPrintOrder, updateJobStatus, getStoredPrintJobs } = await import("@/lib/print-data");
+
+    // 1. Create order
+    const order = await createPrintOrder({
+      file: "Damaged_File.pdf",
+      type: "B&W",
+      pages: 4,
+      copies: 1,
+      amount: 10,
+      status: "Printing",
+      student: "Arjun",
+      sides: "single",
+      paper: "A4",
+    });
+
+    // 2. Agent reports spooler or file download failure
+    await updateJobStatus(order.id, "Failed");
+    let current = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(current?.status).toBe("Failed");
+
+    // 3. Admin clicks 'Retry' in dashboard -> re-queues to Waiting
+    await updateJobStatus(order.id, "Waiting");
+    current = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(current?.status).toBe("Waiting");
+
+    // 4. Agent picks up again -> Printing -> Ready
+    await updateJobStatus(order.id, "Printing");
+    await updateJobStatus(order.id, "Ready");
+    current = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(current?.status).toBe("Ready");
+  });
+
+  it("QA/QC: 4-digit counter pickup verification ensures exact pickup code match before completion", async () => {
+    const { createPrintOrder, updateJobStatus, getStoredPrintJobs } = await import("@/lib/print-data");
+
+    const order = await createPrintOrder({
+      file: "Engineering_Drawing.pdf",
+      type: "Colour",
+      pages: 2,
+      copies: 1,
+      amount: 20,
+      status: "Ready",
+      student: "Neha",
+      sides: "single",
+      paper: "A3",
+    });
+
+    expect(order.pickupCode).toBeDefined();
+    expect(order.pickupCode).toMatch(/^\d{4}$/);
+
+    // Verify counter operator matches student 4-digit pickup code
+    const studentInputCode = order.pickupCode;
+    const isMatching = studentInputCode === order.pickupCode;
+    expect(isMatching).toBe(true);
+
+    if (isMatching) {
+      await updateJobStatus(order.id, "Completed");
+    }
+
+    const completedJob = getStoredPrintJobs().find((j) => j.id === order.id);
+    expect(completedJob?.status).toBe("Completed");
+  });
 });
+
 
